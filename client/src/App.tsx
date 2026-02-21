@@ -21,6 +21,7 @@ import { useAuthStore } from './stores/authStore'
 function App() {
   const { data: userData, isLoading: isUserLoading } = useUser();
   const { login, logout, isAuthenticated } = useAuthStore();
+  const hasToken = !!localStorage.getItem('access_token');
 
   useEffect(() => {
     if (userData && !isAuthenticated) {
@@ -34,7 +35,7 @@ function App() {
     }
   }, [userData, isUserLoading, login, logout, isAuthenticated]);
 
-  if (isUserLoading) {
+  if (hasToken && isUserLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-slate-50">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-600"></div>

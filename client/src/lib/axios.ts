@@ -28,7 +28,7 @@ const processQueue = (error: AxiosError | null, token: string | null = null) => 
 api.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
     const token = localStorage.getItem('access_token') || localStorage.getItem('token');
-    
+
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -69,7 +69,6 @@ api.interceptors.response.use(
         isRefreshing = false;
         localStorage.removeItem('access_token');
         localStorage.removeItem('token');
-        window.location.href = '/login'; 
         return Promise.reject(error);
       }
 
@@ -89,14 +88,13 @@ api.interceptors.response.use(
 
         processQueue(null, newAccessToken);
         originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
-        
+
         return api(originalRequest);
       } catch (err) {
         processQueue(err as AxiosError, null);
         localStorage.removeItem('access_token');
         localStorage.removeItem('refresh_token');
         localStorage.removeItem('token');
-        window.location.href = '/login';
         return Promise.reject(err);
       } finally {
         isRefreshing = false;

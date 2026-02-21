@@ -50,7 +50,7 @@ export function AppSidebar() {
         <Sidebar variant="sidebar" collapsible="icon">
             <SidebarHeader className="flex items-center justify-center py-6">
                 <div className="flex items-center gap-3 px-2 text-teal-600 font-bold text-xl">
-                    <img src="/logo.png" alt="AirSense Logo" className="size-8 object-contain" />
+                    <img src="/airsense_logo-removebg-preview.png" alt="AirSense Logo" className="size-8 object-contain" />
                     <span className="group-data-[collapsible=icon]:hidden tracking-tight">AirSense</span>
                 </div>
             </SidebarHeader>
@@ -61,9 +61,9 @@ export function AppSidebar() {
                         <SidebarMenu>
                             {items.map((item) => (
                                 <SidebarMenuItem key={item.title}>
-                                    <SidebarMenuButton asChild isActive={location.pathname === item.url} tooltip={item.title}>
-                                        <Link to={item.url}>
-                                            <item.icon />
+                                    <SidebarMenuButton asChild isActive={location.pathname === item.url} tooltip={item.title} className="h-12">
+                                        <Link to={item.url} className="flex items-center gap-3 text-base font-medium">
+                                            <item.icon className="size-5" />
                                             <span>{item.title}</span>
                                         </Link>
                                     </SidebarMenuButton>

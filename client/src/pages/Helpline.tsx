@@ -67,7 +67,7 @@ export default function Helpline() {
                         </Card>
 
                         {/* Mental Health Section */}
-                        <Card className="border-0 shadow-xl shadow-rose-100/50 rounded-3xl overflow-hidden bg-gradient-to-br from-rose-500 to-pink-600 text-white">
+                        <Card className="border-0 shadow-xl shadow-teal-100/50 rounded-3xl overflow-hidden bg-gradient-to-br from-teal-600 to-blue-700 text-white">
                             <CardContent className="p-8 space-y-6 relative overflow-hidden">
                                 <Heart className="absolute -right-8 -bottom-8 size-48 opacity-10" />
                                 <div className="relative z-10 space-y-4">
@@ -75,13 +75,13 @@ export default function Helpline() {
                                         <Shield className="size-6" />
                                         <h3 className="text-2xl font-bold">Mental Health Help</h3>
                                     </div>
-                                    <p className="text-rose-50 text-base leading-relaxed">
+                                    <p className="text-teal-50 text-base leading-relaxed font-medium">
                                         Air quality can impact your mental well-being. If you're feeling overwhelmed, anxious, or just need to talk, we can connect you with a professional counsellor immediately.
                                     </p>
-                                    <Button className="w-full bg-white text-rose-600 hover:bg-rose-50 h-14 rounded-2xl font-bold text-lg shadow-lg">
+                                    <Button className="w-full bg-white text-teal-700 hover:bg-teal-50 h-14 rounded-2xl font-bold text-lg shadow-lg">
                                         Connect with a Counsellor
                                     </Button>
-                                    <p className="text-xs text-rose-100 text-center">Your privacy is our priority. All conversations are confidential.</p>
+                                    <p className="text-xs text-teal-100 text-center">Your privacy is our priority. All conversations are confidential.</p>
                                 </div>
                             </CardContent>
                         </Card>

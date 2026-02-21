@@ -2,8 +2,9 @@ import { useState, useRef } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
-import { MapPin, Upload, AlertTriangle, Building2, Send, Loader2, CheckCircle2, X, Camera, Map as MapIcon } from 'lucide-react'
-import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet'
+import { MapPin, Upload, AlertTriangle, Building2, Send, Loader2, CheckCircle2, X, Camera, Map as MapIcon, Search } from 'lucide-react'
+import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from 'react-leaflet'
+import { Input } from '@/components/ui/input'
 import L from 'leaflet'
 
 // Fix for default marker icon in Leaflet
@@ -32,6 +33,48 @@ function LocationPicker({ onLocationSelect }: { onLocationSelect: (lat: number, 
 
     return (
         <Marker position={position} icon={DefaultIcon} />
+    )
+}
+
+function MapSearch({ onSearch }: { onSearch: (lat: number, lng: number) => void }) {
+    const [query, setQuery] = useState('')
+    const [isSearching, setIsSearching] = useState(false)
+    const map = useMap()
+
+    const handleSearch = async (e: React.FormEvent) => {
+        e.preventDefault()
+        if (!query.trim()) return
+
+        setIsSearching(true)
+        try {
+            const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query + ', Chennai')}`)
+            const data = await response.json()
+            if (data && data.length > 0) {
+                const { lat, lon } = data[0]
+                const newLat = parseFloat(lat)
+                const newLng = parseFloat(lon)
+                map.flyTo([newLat, newLng], 15)
+                onSearch(newLat, newLng)
+            }
+        } catch (error) {
+            console.error('Search error:', error)
+        } finally {
+            setIsSearching(false)
+        }
+    }
+
+    return (
+        <div className="absolute top-4 left-4 right-4 z-[1000]">
+            <form onSubmit={handleSearch} className="relative">
+                <Input
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    placeholder="Search area (e.g. Adyar, T.Nagar)..."
+                    className="h-12 pl-12 pr-4 bg-white/95 backdrop-blur-md border-slate-200 shadow-xl rounded-xl focus-visible:ring-teal-500"
+                />
+                <Search className={`absolute left-4 top-1/2 -translate-y-1/2 size-5 ${isSearching ? 'text-teal-500 animate-pulse' : 'text-slate-400'}`} />
+            </form>
+        </div>
     )
 }
 
@@ -195,6 +238,7 @@ export default function ReportPollution() {
                                             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                                             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                                         />
+                                        <MapSearch onSearch={(lat, lng) => setLocation([lat, lng])} />
                                         <LocationPicker onLocationSelect={(lat, lng) => setLocation([lat, lng])} />
                                     </MapContainer>
                                     <div className="absolute bottom-4 left-4 right-4 z-[1000] bg-white/95 backdrop-blur-md p-3 rounded-xl border border-slate-200 shadow-lg flex items-center gap-3">

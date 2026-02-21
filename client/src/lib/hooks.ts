@@ -5,6 +5,7 @@ export const useUser = () => {
   return useQuery<User>({
     queryKey: ['user'],
     queryFn: authApi.getCurrentUser,
+    enabled: !!localStorage.getItem('access_token'), // Only fetch if a token exists
     retry: false, // Don't retry if not logged in
     staleTime: 5 * 60 * 1000, // Check again after 5 minutes
   });

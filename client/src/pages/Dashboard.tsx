@@ -220,8 +220,8 @@ export default function Dashboard() {
                     {/* Bottom Bar: Timeframe Toggles */}
                     <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-16 pointer-events-none">
                         <div className="flex-1 max-w-xl">
-                            <h3 className="text-4xl font-bold text-white mb-3 drop-shadow-lg">Forecast Prediction</h3>
-                            <p className="text-slate-200 font-medium drop-shadow-md pb-6 text-lg">Scroll down to see detailed forecasting, personalized insights, and your health metrics.</p>
+                            <h3 className="text-5xl font-black text-teal-400 mb-3 drop-shadow-[0_2px_10px_rgba(0,0,0,0.5)]">Forecast Prediction</h3>
+                            <p className="text-white font-semibold drop-shadow-[0_1px_5px_rgba(0,0,0,0.5)] pb-6 text-xl leading-relaxed">Scroll down to see detailed forecasting, personalized insights, and your health metrics.</p>
                         </div>
 
                         <div className="bg-white/90 backdrop-blur-md p-1.5 rounded-2xl shadow-xl border border-white/40 flex gap-1 self-start md:self-auto pointer-events-auto">
