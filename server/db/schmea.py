@@ -37,6 +37,7 @@ CREATE_TABLE_TOKEN_BLOCKLIST = """
 CREATE_TABLE_AIR_QUALITY_DATA = """
     CREATE TABLE IF NOT EXISTS air_quality_data (
     id uuid DEFAULT uuid_generate_v4() PRIMARY KEY,
+    node_id int,
     timestamp timestamptz,
     lat float,
     lon float,
@@ -44,7 +45,14 @@ CREATE_TABLE_AIR_QUALITY_DATA = """
     no2 float,
     o3 float,
     wind_speed float,
+    wind_direction float,
+    temperature float,
+    humidity float,
     traffic_density int,
+    traffic_current_speed float,
+    traffic_free_flow_speed float,
+    traffic_confidence float,
+    risk_score int,
     risk_level text
     );
 """
