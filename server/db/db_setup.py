@@ -2,7 +2,7 @@ import psycopg2
 from psycopg2 import pool
 import os
 from dotenv import load_dotenv
-from schema import SCHEMA_LIST
+from .schmea import SCHEMA_LIST
 from contextlib import contextmanager
 
 load_dotenv()
