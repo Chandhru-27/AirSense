@@ -4,55 +4,53 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button'
 import { MapPin, Wind, CloudRain, Sun, Cloud, AlertCircle, Thermometer, Info, Activity } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, BarChart, Bar } from 'recharts'
-import { MapContainer, TileLayer, Circle } from 'react-leaflet'
+import { useState, useEffect } from 'react'
+import { MapContainer, TileLayer, Circle, useMap, Tooltip as LeafletTooltip } from 'react-leaflet'
 
-const chennaiCenter: [number, number] = [13.0827, 80.2707];
+// Default fallback center if location access is denied
+const fallbackCenter: [number, number] = [13.0827, 80.2707];
 
-const generateMockHeatmapData = () => {
-    const points = [];
-    const numPoints = 150;
-
-    // Seeded random for consistent data points
-    let seed = 1;
-    const random = () => {
-        const x = Math.sin(seed++) * 10000;
-        return x - Math.floor(x);
-    };
-
-    for (let i = 0; i < numPoints; i++) {
-        // Distribute points around Chennai (approx 30km spread)
-        const lat = 13.0827 + (random() - 0.5) * 0.3;
-        const lng = 80.2707 + (random() - 0.5) * 0.3;
-
-        let aqi = random() * 100;
-
-        // Industrial North is usually worse
-        if (lat > 13.15) aqi += 80 + random() * 50;
-        // Coastal areas are usually better
-        else if (lng > 80.25 && lat < 13.05) aqi = Math.max(20, aqi - 30);
-        // Commercial areas
-        else aqi += random() * 60;
-
-        let color = '#10b981'; // green (Good)
-        if (aqi > 150) color = '#ef4444'; // red (Unhealthy)
-        else if (aqi > 100) color = '#f97316'; // orange (Unhealthy for Sensitive)
-        else if (aqi > 50) color = '#f59e0b'; // yellow (Moderate)
-
-        points.push({ lat, lng, color, aqi, radius: 600 + random() * 1200 });
-    }
-    return points;
+// Component to dynamically update map center when location changes
+function MapController({ center }: { center: [number, number] }) {
+    const map = useMap();
+    useEffect(() => {
+        map.setView(center, map.getZoom());
+    }, [center, map]);
+    return null;
 }
-const heatmapData = generateMockHeatmapData();
 
+// Chennai Pollution Risk Points
+const chennaiRiskPoints = [
+    { name: "Manali Industrial Zone", lat: 13.1667, lng: 80.2667, risk: "Severe", color: "#ef4444", aqi: 185 },
+    { name: "T. Nagar Commercial Hub", lat: 13.0418, lng: 80.2341, risk: "Medium", color: "#f97316", aqi: 112 },
+    { name: "Adyar Residential Area", lat: 13.0033, lng: 80.2550, risk: "Minimal", color: "#10b981", aqi: 42 },
+    { name: "Ambattur Industrial Estate", lat: 13.1143, lng: 80.1548, risk: "Severe", color: "#ef4444", aqi: 168 },
+    { name: "Marina Beach", lat: 13.0500, lng: 80.2824, risk: "Minimal", color: "#10b981", aqi: 35 },
+    { name: "Guindy Tech Park", lat: 13.0067, lng: 80.2206, risk: "Medium", color: "#f97316", aqi: 95 },
+    { name: "Velachery Junction", lat: 12.9792, lng: 80.2184, risk: "Medium", color: "#f97316", aqi: 125 },
+    { name: "Perungudi Dump Yard", lat: 12.9385, lng: 80.2312, risk: "Severe", color: "#ef4444", aqi: 195 },
+]
 
 const mockWeeklyWeather = [
-    { day: 'Mon', condition: 'Sunny', temp: 24, icon: Sun },
-    { day: 'Tue', condition: 'Cloudy', temp: 22, icon: Cloud },
-    { day: 'Wed', condition: 'Rainy', temp: 19, icon: CloudRain },
-    { day: 'Thu', condition: 'Windy', temp: 21, icon: Wind },
-    { day: 'Fri', condition: 'Sunny', temp: 25, icon: Sun },
-    { day: 'Sat', condition: 'Sunny', temp: 26, icon: Sun },
-    { day: 'Sun', condition: 'Cloudy', temp: 23, icon: Cloud },
+    { day: 'Sat', condition: 'Rainy', high: 28, low: 24, icon: CloudRain },
+    { day: 'Sun', condition: 'Partly Cloudy', high: 29, low: 24, icon: Cloud },
+    { day: 'Mon', condition: 'Sunny', high: 29, low: 24, icon: Sun },
+    { day: 'Tue', condition: 'Partly Cloudy', high: 29, low: 23, icon: Sun },
+    { day: 'Wed', condition: 'Partly Cloudy', high: 29, low: 23, icon: Sun },
+    { day: 'Thu', condition: 'Sunny', high: 29, low: 23, icon: Sun },
+    { day: 'Fri', condition: 'Sunny', high: 31, low: 23, icon: Sun },
+    { day: 'Sat', condition: 'Sunny', high: 31, low: 23, icon: Sun },
+]
+
+const weatherTimeline = [
+    { time: '7 pm', temp: 26 },
+    { time: '10 pm', temp: 26 },
+    { time: '1 am', temp: 26 },
+    { time: '4 am', temp: 25 },
+    { time: '7 am', temp: 24 },
+    { time: '10 am', temp: 28 },
+    { time: '1 pm', temp: 29 },
+    { time: '4 pm', temp: 28 },
 ]
 
 const mockAqiHistory = [
@@ -83,6 +81,13 @@ export default function Dashboard() {
         { label: '+24hr', value: '24hr' },
         { label: '+2 Days', value: '2d' },
     ]
+
+    const [location] = useState<[number, number]>(fallbackCenter)
+    const [locationName, setLocationName] = useState("Chennai City")
+
+    useEffect(() => {
+        setLocationName("Chennai City");
+    }, []);
 
     // Generate personalized insights based on Zustand store
     const getInsights = () => {
@@ -147,23 +152,34 @@ export default function Dashboard() {
             {/* 1. Fullscreen Heatmap Section */}
             <section className="relative w-full h-[100vh] min-h-[600px] bg-slate-900 overflow-hidden shrink-0">
                 <div className="absolute inset-0 z-0">
-                    <MapContainer center={chennaiCenter} zoom={12} style={{ height: '100%', width: '100%', zIndex: 0 }} zoomControl={false} scrollWheelZoom={false}>
+                    <MapContainer center={location} zoom={12} style={{ height: '100%', width: '100%', zIndex: 0 }} zoomControl={false} scrollWheelZoom={false}>
+                        <MapController center={location} />
                         <TileLayer
-                            attribution='&copy; <a href="https://carto.com/">CARTO</a>'
-                            url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+                            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                         />
-                        {heatmapData.map((point, idx) => (
+                        {chennaiRiskPoints.map((point, idx) => (
                             <Circle
                                 key={idx}
                                 center={[point.lat, point.lng]}
-                                radius={point.radius}
+                                radius={400}
                                 pathOptions={{
                                     color: point.color,
                                     fillColor: point.color,
-                                    fillOpacity: 0.3,
-                                    stroke: false
+                                    fillOpacity: 0.8,
+                                    stroke: true,
+                                    weight: 2
                                 }}
-                            />
+                            >
+                                <LeafletTooltip>
+                                    <div className="bg-white p-2 rounded shadow-lg border border-slate-200">
+                                        <p className="font-bold text-slate-800">{point.name}</p>
+                                        <p className="text-sm text-slate-500">Risk: <span style={{ color: point.color }}>{point.risk}</span></p>
+                                        <p className="text-xs text-slate-400">AQI: {point.aqi}</p>
+                                        <p className="text-[10px] text-slate-300 mt-1">{point.lat.toFixed(4)}, {point.lng.toFixed(4)}</p>
+                                    </div>
+                                </LeafletTooltip>
+                            </Circle>
                         ))}
                     </MapContainer>
                 </div>
@@ -182,7 +198,7 @@ export default function Dashboard() {
                         <div className="flex items-center gap-3 bg-white/10 backdrop-blur-md px-4 py-2.5 rounded-full border border-white/20 shadow-lg pointer-events-auto">
                             <MapPin className="text-teal-400 size-5" />
                             <div>
-                                <h2 className="text-white font-semibold text-lg leading-none">Chennai City</h2>
+                                <h2 className="text-white font-semibold text-lg leading-none">{locationName}</h2>
                                 <p className="text-slate-300 text-sm mt-1">Live Street-level AQI</p>
                             </div>
                         </div>
@@ -204,8 +220,8 @@ export default function Dashboard() {
                     {/* Bottom Bar: Timeframe Toggles */}
                     <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-16 pointer-events-none">
                         <div className="flex-1 max-w-xl">
-                            <h3 className="text-4xl font-bold text-white mb-3 drop-shadow-lg">Forecast Prediction</h3>
-                            <p className="text-slate-200 font-medium drop-shadow-md pb-6 text-lg">Scroll down to see detailed forecasting, personalized insights, and your health metrics.</p>
+                            <h3 className="text-5xl font-black text-teal-400 mb-3 drop-shadow-[0_2px_10px_rgba(0,0,0,0.5)]">Forecast Prediction</h3>
+                            <p className="text-white font-semibold drop-shadow-[0_1px_5px_rgba(0,0,0,0.5)] pb-6 text-xl leading-relaxed">Scroll down to see detailed forecasting, personalized insights, and your health metrics.</p>
                         </div>
 
                         <div className="bg-white/90 backdrop-blur-md p-1.5 rounded-2xl shadow-xl border border-white/40 flex gap-1 self-start md:self-auto pointer-events-auto">
@@ -231,20 +247,92 @@ export default function Dashboard() {
             <div className="max-w-7xl mx-auto w-full px-4 lg:px-8 space-y-8 -mt-8 relative z-20">
 
                 {/* Weather Animation Row */}
-                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
-                    {mockWeeklyWeather.map((day, i) => (
-                        <Card key={i} className={`border-0 shadow-sm transition-transform hover:-translate-y-1 ${i === 0 ? 'bg-teal-500 text-white shadow-teal-500/30' : 'bg-white'}`}>
-                            <CardContent className="p-4 flex flex-col items-center justify-center text-center gap-3">
-                                <span className={`text-xs font-bold uppercase tracking-wider ${i === 0 ? 'text-teal-100' : 'text-slate-400'}`}>{day.day}</span>
-                                <day.icon className={`size-8 ${i === 0 ? 'text-white drop-shadow-md' : 'text-slate-700'}`} />
-                                <div>
-                                    <span className="text-lg font-bold">{day.temp}°</span>
-                                    <span className={`text-sm block mt-0.5 font-medium ${i === 0 ? 'text-teal-100' : 'text-slate-500'}`}>{day.condition}</span>
+                {/* Weather Hub Section */}
+                <Card className="border-0 shadow-2xl rounded-[32px] overflow-hidden bg-[#1e1e1e] text-white">
+                    <CardContent className="p-0">
+                        {/* Top Weather Info */}
+                        <div className="p-8 lg:p-12 flex flex-col lg:flex-row lg:items-center justify-between gap-8">
+                            <div className="flex items-center gap-6">
+                                <div className="relative">
+                                    <Sun className="size-20 text-yellow-500 fill-yellow-500/20" />
+                                    <Cloud className="size-12 text-slate-400 absolute -bottom-2 -right-2" />
                                 </div>
-                            </CardContent>
-                        </Card>
-                    ))}
-                </div>
+                                <div>
+                                    <div className="flex items-baseline gap-2">
+                                        <span className="text-8xl font-medium tracking-tighter">26</span>
+                                        <div className="text-2xl font-light text-slate-400 flex gap-2">
+                                            <span className="text-white font-normal">°C</span>
+                                            <span>|</span>
+                                            <span>°F</span>
+                                        </div>
+                                    </div>
+                                    <div className="flex gap-4 text-slate-400 text-sm mt-2">
+                                        <span>Precipitation: 8%</span>
+                                        <span>Humidity: 79%</span>
+                                        <span>Wind: 18 km/h</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="text-right">
+                                <h2 className="text-5xl font-light tracking-tight">Weather</h2>
+                                <p className="text-slate-400 mt-1 text-lg">Saturday, 6:00 pm</p>
+                                <p className="text-slate-400 font-medium">Clear with periodic clouds</p>
+                            </div>
+                        </div>
+
+                        {/* Tabs */}
+                        <div className="px-8 lg:px-12 flex gap-8 text-lg font-medium border-b border-white/5">
+                            <button className="pb-4 border-b-2 border-yellow-500 text-white">Temperature</button>
+                            <button className="pb-4 text-slate-500 hover:text-slate-300">Precipitation</button>
+                            <button className="pb-4 text-slate-500 hover:text-slate-300">Wind</button>
+                        </div>
+
+                        {/* Temperature Chart */}
+                        <div className="p-4 lg:p-12 pb-4">
+                            <div className="h-[200px] w-full relative">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <LineChart data={weatherTimeline}>
+                                        <XAxis dataKey="time" hide />
+                                        <YAxis hide domain={['dataMin - 5', 'dataMax + 5']} />
+                                        <Line
+                                            type="monotone"
+                                            dataKey="temp"
+                                            stroke="#facc15"
+                                            strokeWidth={3}
+                                            dot={{ fill: '#facc15', r: 0 }}
+                                            activeDot={{ r: 6 }}
+                                            label={(props: any) => (
+                                                <text x={props.x} y={props.y - 15} fill="#fff" fontSize={12} textAnchor="middle" fontWeight="bold">
+                                                    {props.value}
+                                                </text>
+                                            )}
+                                        />
+                                    </LineChart>
+                                </ResponsiveContainer>
+                                <div className="absolute inset-x-12 bottom-0 h-2 bg-gradient-to-r from-yellow-500/20 via-yellow-500/5 to-transparent rounded-full" />
+                            </div>
+                            <div className="flex justify-between px-4 lg:px-12 mt-4 text-slate-500 text-sm font-medium">
+                                {weatherTimeline.map((item, idx) => (
+                                    <span key={idx}>{item.time}</span>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* 7-Day Forecast */}
+                        <div className="p-6 lg:p-10 border-t border-white/5 grid grid-cols-4 lg:grid-cols-8 gap-4">
+                            {mockWeeklyWeather.map((day, i) => (
+                                <div key={i} className={`flex flex-col items-center gap-4 p-4 rounded-3xl transition-all ${i === 0 ? 'bg-white/5 border border-white/10' : 'hover:bg-white/5'}`}>
+                                    <span className="font-bold text-lg">{day.day}</span>
+                                    <day.icon className={`size-10 ${i === 0 ? 'text-blue-400' : 'text-yellow-500'}`} />
+                                    <div className="flex flex-col items-center">
+                                        <span className="font-bold text-xl">{day.high}°</span>
+                                        <span className="text-slate-500 font-medium">{day.low}°</span>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </CardContent>
+                </Card>
 
                 <div className="grid lg:grid-cols-3 gap-8">
 

@@ -11,9 +11,37 @@ import Personalize from './pages/Personalize'
 import Dashboard from './pages/Dashboard'
 import PlanTrip from './pages/PlanTrip'
 import ChatBot from './pages/ChatBot'
-import Profile from './pages/Profile' 
+import Profile from './pages/Profile'
+import Helpline from './pages/Helpline'
+import ReportPollution from './pages/ReportPollution'
+import { useEffect } from 'react'
+import { useUser } from './lib/hooks'
+import { useAuthStore } from './stores/authStore'
 
 function App() {
+  const { data: userData, isLoading: isUserLoading } = useUser();
+  const { login, logout, isAuthenticated } = useAuthStore();
+  const hasToken = !!localStorage.getItem('access_token');
+
+  useEffect(() => {
+    if (userData && !isAuthenticated) {
+      login(
+        { id: userData.user_id, name: userData.username || 'User', email: userData.email || '' },
+        localStorage.getItem('access_token') || ''
+      );
+    } else if (!userData && !isUserLoading && isAuthenticated) {
+      // If query fails and we thought we were authenticated, logout
+      logout();
+    }
+  }, [userData, isUserLoading, login, logout, isAuthenticated]);
+
+  if (hasToken && isUserLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-slate-50">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-600"></div>
+      </div>
+    );
+  }
   return (
     <BrowserRouter>
       <Routes>
@@ -31,6 +59,8 @@ function App() {
             <Route path="/plan-trip" element={<PlanTrip />} />
             <Route path="/chatbot" element={<ChatBot />} />
             <Route path="/profile" element={<Profile />} />
+            <Route path="/helpline" element={<Helpline />} />
+            <Route path="/report" element={<ReportPollution />} />
           </Route>
 
           {/* Standalone protected route without sidebar */}
