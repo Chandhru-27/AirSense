@@ -26,7 +26,7 @@ class BaseConfig:
 class DevConfig(BaseConfig):
     """Development config: Allow non-HTTPS and non-CSRF protect"""
     DEBUG = True
-    CORS_ORIGINS = ["http://localhost:5173","http://127.0.0.1:5173"]
+    CORS_ORIGINS = ["http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:5178", "http://127.0.0.1:5178"]
 
 class ProdConfig(BaseConfig):
     """Production config: Enforce HTTPS and CSRF protect for custom domain"""
