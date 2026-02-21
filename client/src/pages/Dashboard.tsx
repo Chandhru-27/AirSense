@@ -4,20 +4,11 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button'
 import { MapPin, Wind, CloudRain, Sun, Cloud, AlertCircle, Thermometer, Info, Activity } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, BarChart, Bar } from 'recharts'
-import { useState, useEffect } from 'react'
-import { MapContainer, TileLayer, Circle, useMap, Tooltip as LeafletTooltip } from 'react-leaflet'
+import { useState } from 'react'
+import MapView from '@/components/map/MapView'
+import LocationSearch from '@/components/map/LocationSearch'
 
-// Default fallback center if location access is denied
-const fallbackCenter: [number, number] = [13.0827, 80.2707];
-
-// Component to dynamically update map center when location changes
-function MapController({ center }: { center: [number, number] }) {
-    const map = useMap();
-    useEffect(() => {
-        map.setView(center, map.getZoom());
-    }, [center, map]);
-    return null;
-}
+// Heatmap and map controllers are now modularized in MapView.tsx
 
 // Chennai Pollution Risk Points
 const chennaiRiskPoints = [
@@ -82,12 +73,8 @@ export default function Dashboard() {
         { label: '+2 Days', value: '2d' },
     ]
 
-    const [location] = useState<[number, number]>(fallbackCenter)
-    const [locationName, setLocationName] = useState("Chennai City")
-
-    useEffect(() => {
-        setLocationName("Chennai City");
-    }, []);
+    const [location, setLocation] = useState<[number, number] | undefined>(undefined)
+    const [locationName, setLocationName] = useState("Predicting...")
 
     // Generate personalized insights based on Zustand store
     const getInsights = () => {
@@ -152,36 +139,13 @@ export default function Dashboard() {
             {/* 1. Fullscreen Heatmap Section */}
             <section className="relative w-full h-[100vh] min-h-[600px] bg-slate-900 overflow-hidden shrink-0">
                 <div className="absolute inset-0 z-0">
-                    <MapContainer center={location} zoom={12} style={{ height: '100%', width: '100%', zIndex: 0 }} zoomControl={false} scrollWheelZoom={false}>
-                        <MapController center={location} />
-                        <TileLayer
-                            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                        />
-                        {chennaiRiskPoints.map((point, idx) => (
-                            <Circle
-                                key={idx}
-                                center={[point.lat, point.lng]}
-                                radius={400}
-                                pathOptions={{
-                                    color: point.color,
-                                    fillColor: point.color,
-                                    fillOpacity: 0.8,
-                                    stroke: true,
-                                    weight: 2
-                                }}
-                            >
-                                <LeafletTooltip>
-                                    <div className="bg-white p-2 rounded shadow-lg border border-slate-200">
-                                        <p className="font-bold text-slate-800">{point.name}</p>
-                                        <p className="text-sm text-slate-500">Risk: <span style={{ color: point.color }}>{point.risk}</span></p>
-                                        <p className="text-xs text-slate-400">AQI: {point.aqi}</p>
-                                        <p className="text-[10px] text-slate-300 mt-1">{point.lat.toFixed(4)}, {point.lng.toFixed(4)}</p>
-                                    </div>
-                                </LeafletTooltip>
-                            </Circle>
-                        ))}
-                    </MapContainer>
+                    <MapView
+                        center={location}
+                        heatmapRequired={true}
+                        heatmapPoints={chennaiRiskPoints}
+                        showUserLocation={true}
+                        onLocationSelect={(lat, lng) => setLocation([lat, lng])}
+                    />
                 </div>
 
                 {/* Top Gradient for text readability */}
@@ -194,13 +158,24 @@ export default function Dashboard() {
                 <div className="absolute inset-0 flex flex-col justify-between p-6 lg:p-10 pointer-events-none z-20">
 
                     {/* Top Bar: Location & Status */}
-                    <div className="flex items-start justify-between">
-                        <div className="flex items-center gap-3 bg-white/10 backdrop-blur-md px-4 py-2.5 rounded-full border border-white/20 shadow-lg pointer-events-auto">
-                            <MapPin className="text-teal-400 size-5" />
-                            <div>
-                                <h2 className="text-white font-semibold text-lg leading-none">{locationName}</h2>
-                                <p className="text-slate-300 text-sm mt-1">Live Street-level AQI</p>
+                    <div className="flex items-start justify-between gap-4">
+                        <div className="flex flex-col gap-4 pointer-events-auto max-w-md w-full">
+                            <div className="flex items-center gap-3 bg-white/10 backdrop-blur-md px-4 py-2.5 rounded-full border border-white/20 shadow-lg">
+                                <MapPin className="text-teal-400 size-5" />
+                                <div>
+                                    <h2 className="text-white font-semibold text-lg leading-none group-data-[collapsible=icon]:hidden">{locationName === "Predicting..." ? "Your Location" : locationName}</h2>
+                                    <p className="text-slate-300 text-sm mt-1">Live Street-level AQI</p>
+                                </div>
                             </div>
+
+                            <LocationSearch
+                                onLocationSelect={(lat, lng, label) => {
+                                    setLocation([lat, lng]);
+                                    if (label) setLocationName(label.split(',')[0]);
+                                }}
+                                placeholder="Search neighborhood..."
+                                className="z-[3000]"
+                            />
                         </div>
 
                         {/* Floating AQI Badge */}
