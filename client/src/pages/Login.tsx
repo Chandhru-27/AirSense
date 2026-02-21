@@ -7,19 +7,20 @@ import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Map, Leaf } from 'lucide-react'
 import { useAuthStore } from '../stores/authStore'
+import { useLogin } from '../lib/hooks'
 
 const loginSchema = z.object({
-    email: z.string().email('Please enter a valid email address'),
+    username: z.string().min(2, 'Username must be at least 2 characters'),
     password: z.string().min(6, 'Password must be at least 6 characters'),
 })
 
 export default function Login() {
-    const [email, setEmail] = useState('')
+    const [username, setUsername] = useState('')
     const [password, setPassword] = useState('')
     const [errors, setErrors] = useState<Record<string, string>>({})
-    const [isLoading, setIsLoading] = useState(false)
     const navigate = useNavigate()
     const { login } = useAuthStore()
+    const { mutateAsync: loginApi, isPending: isLoading } = useLogin()
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -27,29 +28,26 @@ export default function Login() {
 
         try {
             // Validate form
-            loginSchema.parse({ email, password })
+            loginSchema.parse({ username, password })
 
-            setIsLoading(true)
-            // Simulate API call
-            await new Promise(resolve => setTimeout(resolve, 800))
+            const res = await loginApi({ username, password })
 
-            // Mock login
             login(
-                { id: '1', name: 'Alex', email },
-                'mock_token_123'
+                { id: username, name: username, email: '' },
+                res.access_token
             )
 
             navigate('/dashboard')
-        } catch (error) {
+        } catch (error: any) {
             if (error instanceof z.ZodError) {
                 const newErrors: Record<string, string> = {}
                 error.issues.forEach((err: z.ZodIssue) => {
                     if (err.path[0]) newErrors[err.path[0].toString()] = err.message
                 })
                 setErrors(newErrors)
+            } else {
+                setErrors({ username: error?.response?.data?.error || 'Login failed. Please check your credentials.' })
             }
-        } finally {
-            setIsLoading(false)
         }
     }
 
@@ -111,16 +109,16 @@ export default function Login() {
                         <CardContent>
                             <form onSubmit={handleSubmit} className="space-y-4">
                                 <div className="space-y-2">
-                                    <Label htmlFor="email" className="text-slate-700">Email address</Label>
+                                    <Label htmlFor="username" className="text-slate-700">Username</Label>
                                     <Input
-                                        id="email"
-                                        type="email"
-                                        placeholder="name@example.com"
-                                        value={email}
-                                        onChange={(e) => setEmail(e.target.value)}
-                                        className={`h-11 bg-slate-50/50 border-slate-200 focus-visible:ring-teal-500 ${errors.email ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
+                                        id="username"
+                                        type="text"
+                                        placeholder="johndoe"
+                                        value={username}
+                                        onChange={(e) => setUsername(e.target.value)}
+                                        className={`h-11 bg-slate-50/50 border-slate-200 focus-visible:ring-teal-500 ${errors.username ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
                                     />
-                                    {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email}</p>}
+                                    {errors.username && <p className="text-red-500 text-xs mt-1">{errors.username}</p>}
                                 </div>
 
                                 <div className="space-y-2">

@@ -1,5 +1,15 @@
 """python file to hold database schema"""
 
+CREATE_TYPE_GENDER_ENUM = """
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'gender_enum') THEN
+        CREATE TYPE gender_enum AS ENUM ('Male', 'Female', 'Other');
+    END IF;
+END$$;
+"""
+
+
 CREATE_TABLE_USERS = """
     CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
@@ -24,8 +34,24 @@ CREATE_TABLE_TOKEN_BLOCKLIST = """
     revoked_at TIMESTAMP DEFAULT now()
     );
 """
+CREATE_TABLE_AIR_QUALITY_DATA = """
+    CREATE TABLE IF NOT EXISTS air_quality_data (
+    id uuid DEFAULT uuid_generate_v4() PRIMARY KEY,
+    timestamp timestamptz,
+    lat float,
+    lon float,
+    pm25 float,
+    no2 float,
+    o3 float,
+    wind_speed float,
+    traffic_density int,
+    risk_level text
+    );
+"""
 
 SCHEMA_LIST = [
+    CREATE_TYPE_GENDER_ENUM,
     CREATE_TABLE_USERS, 
     CREATE_TABLE_TOKEN_BLOCKLIST,
+    CREATE_TABLE_AIR_QUALITY_DATA
 ]

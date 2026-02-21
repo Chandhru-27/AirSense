@@ -7,9 +7,10 @@ import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Map, Leaf } from 'lucide-react'
 import { useAuthStore } from '../stores/authStore'
+import { useRegister, useLogin } from '../lib/hooks'
 
 const signupSchema = z.object({
-  name: z.string().min(2, 'Name must be at least 2 characters'),
+  username: z.string().min(2, 'Username must be at least 2 characters'),
   email: z.string().email('Please enter a valid email address'),
   password: z.string().min(6, 'Password must be at least 6 characters'),
   confirmPassword: z.string()
@@ -20,15 +21,18 @@ const signupSchema = z.object({
 
 export default function Signup() {
   const [formData, setFormData] = useState({
-    name: '',
+    username: '',
     email: '',
     password: '',
     confirmPassword: ''
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
-  const [isLoading, setIsLoading] = useState(false)
   const navigate = useNavigate()
   const { login } = useAuthStore()
+  const { mutateAsync: registerApi, isPending: isRegistering } = useRegister()
+  const { mutateAsync: loginApi, isPending: isLoggingIn } = useLogin()
+
+  const isLoading = isRegistering || isLoggingIn;
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData(prev => ({ ...prev, [e.target.id]: e.target.value }))
@@ -40,29 +44,38 @@ export default function Signup() {
 
     try {
       signupSchema.parse(formData)
-      setIsLoading(true)
 
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 800))
+      // Send the registration request to /auth/signup
+      const res = await registerApi({
+        username: formData.username,
+        email: formData.email,
+        password: formData.password
+      })
 
-      // Mock signup & auto-login
+      // The registration returns user info, but we must login to get the access tokens.
+      const loginRes = await loginApi({
+        username: formData.username,
+        password: formData.password
+      })
+
+      // Update local auth state with the new tokens
       login(
-        { id: Math.random().toString(), name: formData.name, email: formData.email },
-        'mock_token_new_user'
+        { id: res.user_id || formData.username, name: formData.username, email: formData.email },
+        loginRes.access_token
       )
 
       // Redirect to personalization flow for new users
       navigate('/personalize')
-    } catch (error) {
+    } catch (error: any) {
       if (error instanceof z.ZodError) {
         const newErrors: Record<string, string> = {}
         error.issues.forEach((err: z.ZodIssue) => {
           if (err.path[0]) newErrors[err.path[0].toString()] = err.message
         })
         setErrors(newErrors)
+      } else {
+        setErrors({ username: error?.response?.data?.error || 'Signup failed. Username or email might already exist.' })
       }
-    } finally {
-      setIsLoading(false)
     }
   }
 
@@ -124,15 +137,15 @@ export default function Signup() {
             <CardContent>
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="name" className="text-slate-700">Full Name</Label>
+                  <Label htmlFor="username" className="text-slate-700">Username</Label>
                   <Input
-                    id="name"
-                    placeholder="John Doe"
-                    value={formData.name}
+                    id="username"
+                    placeholder="johndoe"
+                    value={formData.username}
                     onChange={handleChange}
-                    className={`h-11 bg-slate-50/50 border-slate-200 focus-visible:ring-teal-500 ${errors.name ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
+                    className={`h-11 bg-slate-50/50 border-slate-200 focus-visible:ring-teal-500 ${errors.username ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
                   />
-                  {errors.name && <p className="text-red-500 text-xs mt-1">{errors.name}</p>}
+                  {errors.username && <p className="text-red-500 text-xs mt-1">{errors.username}</p>}
                 </div>
 
                 <div className="space-y-2">
