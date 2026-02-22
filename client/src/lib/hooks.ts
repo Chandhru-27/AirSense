@@ -1,13 +1,20 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { authApi, type LoginResponse, type SignupResponse, type User } from './api';
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  authApi,
+  reportApi,
+  type LoginResponse,
+  type SignupResponse,
+  type User,
+  type SubmitReportPayload,
+} from "./api";
 
 export const useUser = () => {
   return useQuery<User>({
-    queryKey: ['user'],
+    queryKey: ["user"],
     queryFn: authApi.getCurrentUser,
-    enabled: !!localStorage.getItem('access_token'), // Only fetch if a token exists
-    retry: false, // Don't retry if not logged in
-    staleTime: 5 * 60 * 1000, // Check again after 5 minutes
+    enabled: !!localStorage.getItem("access_token"),
+    retry: false,
+    staleTime: 5 * 60 * 1000,
   });
 };
 
@@ -17,8 +24,7 @@ export const useLogin = () => {
   return useMutation<LoginResponse, Error, any>({
     mutationFn: (credentials) => authApi.login(credentials),
     onSuccess: () => {
-      // Invalidate the user query to refetch data after successful login
-      queryClient.invalidateQueries({ queryKey: ['user'] });
+      queryClient.invalidateQueries({ queryKey: ["user"] });
     },
   });
 };
@@ -35,8 +41,35 @@ export const useLogout = () => {
   return useMutation({
     mutationFn: authApi.logout,
     onSuccess: () => {
-      // Clear all cached queries when user logs out
       queryClient.clear();
     },
+  });
+};
+
+export const useSendMessage = () => {
+  return useMutation({
+    mutationFn: (data: {
+      full_name?: string;
+      email?: string;
+      message: string;
+    }) => authApi.sendUserMessage(data),
+  });
+};
+
+export const useSubmitReport = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: SubmitReportPayload) => reportApi.submit(payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["my-reports"] });
+    },
+  });
+};
+
+export const useMyReports = () => {
+  return useQuery({
+    queryKey: ["my-reports"],
+    queryFn: () => reportApi.list(),
+    staleTime: 2 * 60 * 1000,
   });
 };
