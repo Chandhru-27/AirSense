@@ -4,19 +4,22 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Phone, Mail, MessageSquare, Heart, Shield, Loader2, CheckCircle2 } from 'lucide-react'
+import { useSendMessage } from '../lib/hooks'
 
 export default function Helpline() {
-    const [isSending, setIsSending] = useState(false)
     const [isSent, setIsSent] = useState(false)
+    const [formData, setFormData] = useState({ full_name: '', email: '', message: '' })
+    const { mutateAsync: sendMessage, isPending: isSending } = useSendMessage()
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
-        setIsSending(true)
-        // Simulate email sending
-        setTimeout(() => {
-            setIsSending(false)
+        try {
+            await sendMessage(formData)
             setIsSent(true)
-        }, 1500)
+            setFormData({ full_name: '', email: '', message: '' })
+        } catch (error) {
+            console.error('Failed to send message:', error)
+        }
     }
 
     return (
@@ -43,7 +46,9 @@ export default function Helpline() {
                                         </div>
                                         <div>
                                             <p className="text-sm font-medium text-slate-500">Call Us</p>
-                                            <p className="text-xl font-bold text-slate-900">+1 (800) AIR-SENSE</p>
+                                            <p className="text-xl font-bold text-slate-900">+91 91234 43219</p>
+                                            <p className="text-xl font-bold text-slate-900">+91 91774 01243</p>
+                                            <p className="text-xl font-bold text-slate-900"><span className='font-medium text-blue-500'>Landline</span> 044 8183 4178</p>
                                         </div>
                                     </div>
 
@@ -118,15 +123,15 @@ export default function Helpline() {
                                     </div>
                                     <div className="space-y-2">
                                         <label className="text-sm font-medium text-slate-700">Your Name</label>
-                                        <Input placeholder="John Doe" required className="h-12 border-slate-200 rounded-xl focus-visible:ring-teal-500" />
+                                        <Input value={formData.full_name} onChange={(e) => setFormData({ ...formData, full_name: e.target.value })} placeholder="John Doe" required className="h-12 border-slate-200 rounded-xl focus-visible:ring-teal-500" />
                                     </div>
                                     <div className="space-y-2">
                                         <label className="text-sm font-medium text-slate-700">Your Email</label>
-                                        <Input type="email" placeholder="john@example.com" required className="h-12 border-slate-200 rounded-xl focus-visible:ring-teal-500" />
+                                        <Input value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} type="email" placeholder="john@example.com" required className="h-12 border-slate-200 rounded-xl focus-visible:ring-teal-500" />
                                     </div>
                                     <div className="space-y-2">
                                         <label className="text-sm font-medium text-slate-700">How can we help?</label>
-                                        <Textarea placeholder="Type your message here..." required className="min-h-[150px] border-slate-200 rounded-xl focus-visible:ring-teal-500 resize-none" />
+                                        <Textarea value={formData.message} onChange={(e) => setFormData({ ...formData, message: e.target.value })} placeholder="Type your message here..." required className="min-h-[150px] border-slate-200 rounded-xl focus-visible:ring-teal-500 resize-none" />
                                     </div>
                                     <Button type="submit" disabled={isSending} className="w-full h-14 bg-slate-900 hover:bg-slate-800 text-white font-bold text-lg rounded-2xl shadow-lg transition-all active:scale-[0.98]">
                                         {isSending ? <Loader2 className="animate-spin mr-2" /> : null}
