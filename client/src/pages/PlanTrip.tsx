@@ -1,7 +1,7 @@
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Map, MapPin, Navigation, Compass, Calendar, Search } from 'lucide-react'
+import { Map, MapPin, Navigation, Compass, Search } from 'lucide-react'
 
 export default function PlanTrip() {
     return (
@@ -17,9 +17,9 @@ export default function PlanTrip() {
                     <p className="text-slate-500 mt-2 text-lg">Check the air quality of your destination before you travel.</p>
                 </div>
 
-                <div className="grid lg:grid-cols-3 gap-8">
+                <div className="max-w-4xl mx-auto space-y-6">
                     {/* Main Content: Search & Route */}
-                    <div className="lg:col-span-2 space-y-6">
+                    <div className="space-y-6">
                         <Card className="border-0 shadow-lg shadow-slate-200/50 rounded-3xl overflow-hidden">
                             <div className="bg-gradient-to-r from-teal-500 to-emerald-500 p-8 text-white relative overflow-hidden">
                                 <div className="absolute right-0 top-0 opacity-10">
@@ -78,40 +78,6 @@ export default function PlanTrip() {
                                 </div>
                                 <h3 className="text-lg font-semibold text-slate-700 w-full mb-1">No active route</h3>
                                 <p>Enter a destination above to generate your health-aware travel plan.</p>
-                            </CardContent>
-                        </Card>
-                    </div>
-
-                    {/* Sidebar: Recent / Saved */}
-                    <div className="space-y-6">
-                        <Card className="border-0 shadow-md shadow-slate-200/40 rounded-3xl bg-white">
-                            <CardHeader>
-                                <CardTitle className="text-lg flex items-center gap-2">
-                                    <Calendar className="text-blue-500 size-5" />
-                                    Upcoming Trips
-                                </CardTitle>
-                                <CardDescription>Your saved travel plans</CardDescription>
-                            </CardHeader>
-                            <CardContent className="space-y-4">
-                                {/* Mock Trip */}
-                                <div className="p-4 rounded-2xl border border-slate-100 hover:border-teal-200 hover:bg-teal-50 cursor-pointer transition-all group">
-                                    <div className="flex justify-between items-start mb-2">
-                                        <span className="font-semibold text-slate-800">Weekend Getaway</span>
-                                        <span className="text-xs font-medium bg-emerald-100 text-emerald-700 px-2 py-1 rounded-full">Good AQI</span>
-                                    </div>
-                                    <div className="flex items-center text-sm text-slate-500 gap-2 mb-3">
-                                        <span>Seattle</span>
-                                        <Navigation className="size-3 transform rotate-90" />
-                                        <span>Vancouver, BC</span>
-                                    </div>
-                                    <div className="text-sm font-medium text-teal-600 flex items-center gap-1 group-hover:gap-2 transition-all">
-                                        View Details →
-                                    </div>
-                                </div>
-
-                                <Button variant="outline" className="w-full border-dashed border-2 rounded-2xl h-14 text-slate-500 hover:text-slate-700 hover:bg-slate-50">
-                                    + Add New Trip
-                                </Button>
                             </CardContent>
                         </Card>
                     </div>

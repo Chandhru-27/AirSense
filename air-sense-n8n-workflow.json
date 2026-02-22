@@ -1,0 +1,312 @@
+{
+    "name": "AirSense - Date Itinerary Webhook",
+    "nodes": [
+        {
+            "parameters": {
+                "httpMethod": "POST",
+                "path": "generate-itinerary",
+                "responseMode": "lastNode",
+                "options": {}
+            },
+            "id": "webhook-trigger",
+            "name": "Webhook: Receive from React",
+            "type": "n8n-nodes-base.webhook",
+            "typeVersion": 1,
+            "position": [
+                -2160,
+                848
+            ],
+            "webhookId": "airsense-generate-itinerary"
+        },
+        {
+            "parameters": {
+                "values": {
+                    "string": [
+                        {
+                            "name": "startLat",
+                            "value": "={{ $json.body.startLat || 35.7073 }}"
+                        },
+                        {
+                            "name": "startLng",
+                            "value": "={{ $json.body.startLng || 139.6656 }}"
+                        },
+                        {
+                            "name": "radius",
+                            "value": "={{ $json.body.radius || 2000 }}"
+                        },
+                        {
+                            "name": "timeLimitMin",
+                            "value": "={{ $json.body.timeLimitMin || 120 }}"
+                        }
+                    ]
+                },
+                "options": {}
+            },
+            "id": "ba7edab9-f196-4fdf-a80d-fcb4b03511c0",
+            "name": "Set Parameters1",
+            "type": "n8n-nodes-base.set",
+            "typeVersion": 1,
+            "position": [
+                -1936,
+                848
+            ]
+        },
+        {
+            "parameters": {
+                "url": "https://maps.googleapis.com/maps/api/place/nearbysearch/json",
+                "options": {},
+                "queryParametersUi": {
+                    "parameter": [
+                        {
+                            "name": "location",
+                            "value": "={{$json.startLat}},{{$json.startLng}}"
+                        },
+                        {
+                            "name": "radius",
+                            "value": "={{$json.radius}}"
+                        },
+                        {
+                            "name": "type",
+                            "value": "cafe"
+                        },
+                        {
+                            "name": "language",
+                            "value": "en"
+                        },
+                        {
+                            "name": "key",
+                            "value": "="
+                        }
+                    ]
+                }
+            },
+            "id": "c799de6c-ac35-4b6e-90ea-c39d74dae838",
+            "name": "Get Nearby Spots1",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 1,
+            "position": [
+                -1712,
+                848
+            ]
+        },
+        {
+            "parameters": {
+                "functionCode": "const results = $json.results || [];\nconst sorted = results\n  .map(r => ({ name: r.name, address: r.vicinity, rating: r.rating || 0, place_id: r.place_id }))\n  .sort((a,b) => b.rating - a.rating)\n  .slice(0,3);\nreturn [{ spots: sorted }];"
+            },
+            "id": "6d19cd88-2da3-44de-9d44-8bec779adee7",
+            "name": "Select Top 3 Spots1",
+            "type": "n8n-nodes-base.function",
+            "typeVersion": 1,
+            "position": [
+                -1488,
+                848
+            ]
+        },
+        {
+            "parameters": {
+                "text": "=Create a 120-minute date itinerary based on these 3 spots. Do not include a Google Maps URL. Output ONLY Markdown text.\n\nSpots:\n1. {{$json.spots[0].name}} (Address: {{$json.spots[0].address}} / Rating: {{$json.spots[0].rating}})\n2. {{$json.spots[1].name}} (Address: {{$json.spots[1].address}} / Rating: {{$json.spots[1].rating}})\n3. {{$json.spots[2].name}} (Address: {{$json.spots[2].address}} / Rating: {{$json.spots[2].rating}})\n",
+                "messages": {
+                    "messageValues": [
+                        {
+                            "message": "You are a friendly AirSense AI date concierge. Generate a beautiful 120-minute date course referencing the given spots. Include order, stay time, and a brief insight."
+                        },
+                        {
+                            "type": "HumanMessagePromptTemplate",
+                            "message": "Generate the itinerary based on: {{JSON.stringify($json.spots, null, 2)}}"
+                        }
+                    ]
+                },
+                "promptType": "define"
+            },
+            "id": "862eb4aa-3ec0-4a11-a65b-bcdd6ecff1a8",
+            "name": "Thinking Date Plan1",
+            "type": "@n8n/n8n-nodes-langchain.chainLlm",
+            "typeVersion": 1.7,
+            "position": [
+                -1264,
+                592
+            ]
+        },
+        {
+            "parameters": {
+                "functionCode": "const spots = $json.spots || [];\nif (!spots.length) return { mapsUrl: 'No spots found', mrkdwn: true };\n\nconst formatSpot = (s) => `${s.name} ${s.address}`;\n\nconst waypoints = spots.slice(0, -1).map(s => formatSpot(s)).join('|');\nconst origin = formatSpot(spots[0]); // Starts at the first spot to be dynamic\nconst destination = formatSpot(spots[spots.length - 1]);\n\nconst url = encodeURI(\n  `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}&travelmode=walking&waypoints=${waypoints}`\n);\n\nreturn {\n  mapsUrl: `<${url}|View Route on Google Maps>`,\n  mrkdwn: true\n};"
+            },
+            "id": "2309d554-5378-48a2-a443-83c36a2491c1",
+            "name": "Create Google Maps Link",
+            "type": "n8n-nodes-base.function",
+            "typeVersion": 1,
+            "position": [
+                -1200,
+                992
+            ]
+        },
+        {
+            "parameters": {
+                "mode": "combine",
+                "combinationMode": "multiplex"
+            },
+            "id": "11767a3b-3396-4c0b-b195-b77e69ee5c0b",
+            "name": "Merge Chat + Map1",
+            "type": "n8n-nodes-base.merge",
+            "typeVersion": 2,
+            "position": [
+                -912,
+                848
+            ]
+        },
+        {
+            "parameters": {
+                "jsCode": "return {\n  itineraryText: $('Merge Chat + Map1').first().json.text,\n  mapsUrl: $('Merge Chat + Map1').first().json.mapsUrl,\n};"
+            },
+            "id": "198c0819-c27d-4bcb-9226-927cd16c28a0",
+            "name": "Format FINAL Response to React",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                -112,
+                848
+            ]
+        },
+        {
+            "parameters": {
+                "respondWith": "json",
+                "responseBody": "={\n\"itinerary\": {{$json.itineraryText}},\n\"map_route_link\": {{$json.mapsUrl}}\n}",
+                "options": {}
+            },
+            "id": "respond-to-webhook",
+            "name": "Respond to Webhook (React)",
+            "type": "n8n-nodes-base.respondToWebhook",
+            "typeVersion": 1,
+            "position": [
+                112,
+                848
+            ]
+        },
+        {
+            "parameters": {
+                "options": {}
+            },
+            "id": "2b87cd1c-3c95-4eb5-ad53-eb69c2e5441a",
+            "name": "OpenRouter Chat Model1",
+            "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+            "typeVersion": 1,
+            "position": [
+                -1200,
+                816
+            ],
+            "credentials": {
+                "openRouterApi": {
+                    "id": "credential-id",
+                    "name": "openRouterApi Credential"
+                }
+            }
+        }
+    ],
+    "connections": {
+        "webhook-trigger": {
+            "main": [
+                [
+                    {
+                        "node": "Set Parameters1",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Set Parameters1": {
+            "main": [
+                [
+                    {
+                        "node": "Get Nearby Spots1",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Get Nearby Spots1": {
+            "main": [
+                [
+                    {
+                        "node": "Select Top 3 Spots1",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Select Top 3 Spots1": {
+            "main": [
+                [
+                    {
+                        "node": "Create Google Maps Link",
+                        "type": "main",
+                        "index": 0
+                    },
+                    {
+                        "node": "Thinking Date Plan1",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Thinking Date Plan1": {
+            "main": [
+                [
+                    {
+                        "node": "Merge Chat + Map1",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Create Google Maps Link": {
+            "main": [
+                [
+                    {
+                        "node": "Merge Chat + Map1",
+                        "type": "main",
+                        "index": 1
+                    }
+                ]
+            ]
+        },
+        "Merge Chat + Map1": {
+            "main": [
+                [
+                    {
+                        "node": "Format FINAL Response to React",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Format FINAL Response to React": {
+            "main": [
+                [
+                    {
+                        "node": "Respond to Webhook (React)",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "OpenRouter Chat Model1": {
+            "ai_languageModel": [
+                [
+                    {
+                        "node": "Thinking Date Plan1",
+                        "type": "ai_languageModel",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    },
+    "settings": {}
+}

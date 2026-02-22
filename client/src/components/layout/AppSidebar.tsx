@@ -1,5 +1,5 @@
 import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarHeader, SidebarFooter, } from "@/components/ui/sidebar"
-import { LayoutDashboard, Map, Bot, LogOut, User as UserIcon } from "lucide-react"
+import { LayoutDashboard, Map, Bot, LogOut, User as UserIcon, PhoneCall, AlertTriangle } from "lucide-react"
 import { useAuthStore } from "../../stores/authStore"
 import { useNavigate, useLocation, Link } from "react-router-dom"
 
@@ -18,6 +18,16 @@ const items = [
         title: "ChatBot",
         url: "/chatbot",
         icon: Bot,
+    },
+    {
+        title: "Report Pollution",
+        url: "/report",
+        icon: AlertTriangle,
+    },
+    {
+        title: "Helpline",
+        url: "/helpline",
+        icon: PhoneCall,
     },
     {
         title: "Profile",
@@ -39,9 +49,9 @@ export function AppSidebar() {
     return (
         <Sidebar variant="sidebar" collapsible="icon">
             <SidebarHeader className="flex items-center justify-center py-6">
-                <div className="flex items-center gap-2 px-2 text-teal-600 font-bold text-xl">
-                    <Map className="size-6" />
-                    <span className="group-data-[collapsible=icon]:hidden">AirSense</span>
+                <div className="flex items-center gap-3 px-2 text-teal-600 font-bold text-xl">
+                    <img src="/airsense_logo-removebg-preview.png" alt="AirSense Logo" className="size-8 object-contain" />
+                    <span className="group-data-[collapsible=icon]:hidden tracking-tight">AirSense</span>
                 </div>
             </SidebarHeader>
             <SidebarContent>
@@ -51,9 +61,9 @@ export function AppSidebar() {
                         <SidebarMenu>
                             {items.map((item) => (
                                 <SidebarMenuItem key={item.title}>
-                                    <SidebarMenuButton asChild isActive={location.pathname === item.url} tooltip={item.title}>
-                                        <Link to={item.url}>
-                                            <item.icon />
+                                    <SidebarMenuButton asChild isActive={location.pathname === item.url} tooltip={item.title} className="h-12">
+                                        <Link to={item.url} className="flex items-center gap-3 text-base font-medium">
+                                            <item.icon className="size-5" />
                                             <span>{item.title}</span>
                                         </Link>
                                     </SidebarMenuButton>
