@@ -49,7 +49,7 @@ export function AppSidebar() {
     return (
         <Sidebar variant="sidebar" collapsible="icon">
             <SidebarHeader className="flex items-center justify-center py-6">
-                <div className="flex items-center gap-3 px-2 text-teal-600 font-bold text-xl">
+                <div className="flex items-center gap-3 px-2 font-bold text-xl" style={{ color: '#5F7A94' }}>
                     <img src="/airsense_logo-removebg-preview.png" alt="AirSense Logo" className="size-8 object-contain" />
                     <span className="group-data-[collapsible=icon]:hidden tracking-tight">AirSense</span>
                 </div>
@@ -78,7 +78,7 @@ export function AppSidebar() {
                     <SidebarMenuItem>
                         <SidebarMenuButton className="h-12 border-t border-border/50 rounded-none">
                             <div className="flex items-center gap-3">
-                                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-teal-100 text-teal-700">
+                                <div className="flex h-8 w-8 items-center justify-center rounded-full" style={{ backgroundColor: '#CFE8FF', color: '#5F7A94' }}>
                                     <UserIcon className="size-4" />
                                 </div>
                                 <div className="grid flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden">
