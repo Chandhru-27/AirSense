@@ -2,40 +2,81 @@ import { useState, useRef } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
-import { MapPin, Upload, AlertTriangle, Building2, Send, Loader2, CheckCircle2, X, Camera, Map as MapIcon } from 'lucide-react'
+import {
+    MapPin, Upload, AlertTriangle, Building2, Send,
+    Loader2, CheckCircle2, X, Camera, Map as MapIcon,
+    AlertCircle, ImageIcon
+} from 'lucide-react'
 import MapView from '@/components/map/MapView'
 import LocationSearch from '@/components/map/LocationSearch'
+import { useSubmitReport } from '@/lib/hooks'
 
 const INITIAL_CHENNAI: [number, number] = [13.0827, 80.2707]
+const MAX_SIZE_BYTES = 5 * 1024 * 1024   // 5 MB
+const MAX_SIZE_LABEL = '5 MB'
 
 export default function ReportPollution() {
     const [description, setDescription] = useState('')
     const [location, setLocation] = useState<[number, number]>(INITIAL_CHENNAI)
-    const [files, setFiles] = useState<File[]>([])
-    const [isSubmitting, setIsSubmitting] = useState(false)
-    const [isSubmitted, setIsSubmitted] = useState(false)
+    const [image, setImage] = useState<File | null>(null)
+    const [imagePreview, setImagePreview] = useState<string | null>(null)
+    const [imageError, setImageError] = useState<string | null>(null)
+
     const fileInputRef = useRef<HTMLInputElement>(null)
 
+    const { mutate: submitReport, isPending, isSuccess, isError, error, data: submittedReport, reset } = useSubmitReport()
+
+    // ── Image handling ────────────────────────────────────────────────────────
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files) {
-            setFiles(prev => [...prev, ...Array.from(e.target.files!)])
+        setImageError(null)
+        const file = e.target.files?.[0]
+        if (!file) return
+
+        if (!file.type.startsWith('image/')) {
+            setImageError('Only image files are accepted (JPEG, PNG, WEBP, etc.)')
+            e.target.value = ''
+            return
         }
+
+        if (file.size > MAX_SIZE_BYTES) {
+            setImageError(`Image exceeds the ${MAX_SIZE_LABEL} limit (${(file.size / 1024 / 1024).toFixed(1)} MB).`)
+            e.target.value = ''
+            return
+        }
+
+        setImage(file)
+        setImagePreview(URL.createObjectURL(file))
     }
 
-    const removeFile = (index: number) => {
-        setFiles(prev => prev.filter((_, i) => i !== index))
+    const removeImage = () => {
+        setImage(null)
+        if (imagePreview) URL.revokeObjectURL(imagePreview)
+        setImagePreview(null)
+        setImageError(null)
+        if (fileInputRef.current) fileInputRef.current.value = ''
     }
 
-    const handleSubmit = async (e: React.FormEvent) => {
+    // ── Submit ────────────────────────────────────────────────────────────────
+    const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault()
-        setIsSubmitting(true)
-
-        // Artificial delay for simulation
-        await new Promise(resolve => setTimeout(resolve, 2000))
-
-        setIsSubmitting(false)
-        setIsSubmitted(true)
+        submitReport({
+            description,
+            lat: location[0],
+            lon: location[1],
+            image,
+        })
     }
+
+    const handleFileAnother = () => {
+        reset()
+        removeImage()
+        setDescription('')
+    }
+
+    // ── Error message helper ──────────────────────────────────────────────────
+    const apiError = isError
+        ? ((error as any)?.response?.data?.error ?? (error as Error)?.message ?? 'Submission failed')
+        : null
 
     return (
         <div className="flex flex-col min-h-screen bg-slate-50 p-6 lg:p-10">
@@ -52,7 +93,8 @@ export default function ReportPollution() {
                     </div>
                 </div>
 
-                {isSubmitted ? (
+                {isSuccess ? (
+                    /* ── Success Card ─────────────────────────────────────────────── */
                     <Card className="border-0 shadow-xl shadow-emerald-100/50 rounded-3xl overflow-hidden bg-white max-w-2xl mx-auto text-center p-12">
                         <CardContent className="space-y-6">
                             <div className="size-24 bg-emerald-100 rounded-full flex items-center justify-center mx-auto text-emerald-600 mb-4 scale-in animate-in duration-500">
@@ -61,12 +103,31 @@ export default function ReportPollution() {
                             <div className="space-y-2">
                                 <h2 className="text-3xl font-bold text-slate-900">Report Successfully Filed!</h2>
                                 <p className="text-slate-500 text-lg">
-                                    The Greater Chennai Corporation has been notified of the issue at
+                                    The Greater Chennai Corporation has been notified of the issue at{' '}
                                     <span className="font-mono bg-slate-100 px-2 py-0.5 rounded ml-1 text-slate-700">
-                                        {location[0].toFixed(4)}, {location[1].toFixed(4)}
+                                        {submittedReport?.lat.toFixed(5)}, {submittedReport?.lon.toFixed(5)}
                                     </span>.
                                 </p>
                             </div>
+
+                            {/* Image confirmation */}
+                            {submittedReport?.image_url && (
+                                <div className="flex items-center justify-center gap-3 bg-slate-50 rounded-2xl p-4 border border-slate-200">
+                                    <img
+                                        src={submittedReport.image_url}
+                                        alt="Submitted evidence"
+                                        className="w-20 h-20 rounded-xl object-cover border border-slate-200"
+                                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
+                                    />
+                                    <div className="text-left">
+                                        <p className="text-sm font-semibold text-slate-700">Image uploaded</p>
+                                        <p className="text-xs text-slate-400 mt-0.5">
+                                            {submittedReport.mime_type} · {((submittedReport.image_size ?? 0) / 1024).toFixed(0)} KB
+                                        </p>
+                                    </div>
+                                </div>
+                            )}
+
                             <div className="bg-emerald-50 p-6 rounded-2xl border border-emerald-100 flex items-start gap-4 text-left">
                                 <Building2 className="text-emerald-600 size-6 shrink-0 mt-1" />
                                 <div>
@@ -74,20 +135,36 @@ export default function ReportPollution() {
                                     <p className="text-emerald-700 text-sm mt-1">A municipal inspector will be assigned to review the evidence and conduct an on-site audit within 48 hours.</p>
                                 </div>
                             </div>
-                            <Button onClick={() => { setIsSubmitted(false); setFiles([]); setDescription('') }} variant="outline" className="h-12 px-8 rounded-xl font-semibold mt-4">
+                            <Button
+                                onClick={handleFileAnother}
+                                variant="outline"
+                                className="h-12 px-8 rounded-xl font-semibold mt-4"
+                            >
                                 File Another Report
                             </Button>
                         </CardContent>
                     </Card>
                 ) : (
                     <div className="grid lg:grid-cols-5 gap-8">
-                        {/* Form Section */}
+                        {/* ── Form Section ─────────────────────────────────────────────── */}
                         <div className="lg:col-span-3 space-y-6">
                             <Card className="border-0 shadow-md shadow-slate-200/50 rounded-3xl bg-white h-full">
                                 <CardContent className="p-8 space-y-6">
                                     <form onSubmit={handleSubmit} className="space-y-6">
+
+                                        {/* API error banner */}
+                                        {apiError && (
+                                            <div className="flex items-start gap-3 bg-red-50 border border-red-200 text-red-700 rounded-2xl p-4 text-sm">
+                                                <AlertCircle className="size-5 shrink-0 mt-0.5" />
+                                                <span>{apiError}</span>
+                                            </div>
+                                        )}
+
+                                        {/* Description */}
                                         <div className="space-y-2">
-                                            <label className="text-sm font-semibold text-slate-700 block text-lg mb-1">Describe the hazard</label>
+                                            <label className="text-sm font-semibold text-slate-700 block text-lg mb-1">
+                                                Describe the hazard
+                                            </label>
                                             <Textarea
                                                 value={description}
                                                 onChange={(e) => setDescription(e.target.value)}
@@ -97,47 +174,90 @@ export default function ReportPollution() {
                                             />
                                         </div>
 
+                                        {/* Image upload */}
                                         <div className="space-y-2">
-                                            <label className="text-sm font-semibold text-slate-700 block text-lg mb-1">Attach Media (Images or Video)</label>
-                                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                                                {files.map((file, idx) => (
-                                                    <div key={idx} className="relative aspect-square rounded-2xl overflow-hidden border border-slate-200 bg-slate-100 group">
-                                                        <div className="absolute inset-0 flex items-center justify-center text-slate-400">
-                                                            <Camera className="size-8" />
+                                            <label className="text-sm font-semibold text-slate-700 block text-lg mb-1">
+                                                Attach Evidence Photo
+                                            </label>
+                                            <p className="text-xs text-slate-400 -mt-1">
+                                                image/* · max {MAX_SIZE_LABEL}
+                                            </p>
+
+                                            {imageError && (
+                                                <div className="flex items-center gap-2 bg-red-50 border border-red-200 text-red-600 rounded-xl px-4 py-2.5 text-sm">
+                                                    <AlertCircle className="size-4 shrink-0" />
+                                                    <span>{imageError}</span>
+                                                </div>
+                                            )}
+
+                                            {image && imagePreview ? (
+                                                /* Preview */
+                                                <div className="relative rounded-2xl overflow-hidden border border-slate-200 bg-slate-100 aspect-video group">
+                                                    <img
+                                                        src={imagePreview}
+                                                        alt="Preview"
+                                                        className="w-full h-full object-cover"
+                                                    />
+                                                    {/* File info overlay */}
+                                                    <div className="absolute bottom-0 inset-x-0 bg-black/50 backdrop-blur-sm px-4 py-2 flex items-center justify-between">
+                                                        <div className="flex items-center gap-2 text-white text-xs">
+                                                            <ImageIcon className="size-3.5" />
+                                                            <span className="truncate max-w-[200px]">{image.name}</span>
+                                                            <span className="text-white/60">
+                                                                {(image.size / 1024).toFixed(0)} KB
+                                                            </span>
                                                         </div>
-                                                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                                            <button onClick={() => removeFile(idx)} type="button" className="p-2 bg-red-500 text-white rounded-full hover:bg-red-600 transform hover:scale-110 transition-all">
-                                                                <X className="size-4" />
-                                                            </button>
-                                                        </div>
-                                                        <div className="absolute bottom-2 left-2 right-2 truncate text-[10px] bg-white/80 backdrop-blur-md px-1 py-0.5 rounded text-slate-700">
-                                                            {file.name}
-                                                        </div>
+                                                        <button
+                                                            type="button"
+                                                            onClick={removeImage}
+                                                            className="p-1.5 bg-red-500 hover:bg-red-600 text-white rounded-full transition-colors"
+                                                        >
+                                                            <X className="size-3.5" />
+                                                        </button>
                                                     </div>
-                                                ))}
+                                                </div>
+                                            ) : (
+                                                /* Drop zone */
                                                 <button
                                                     type="button"
                                                     onClick={() => fileInputRef.current?.click()}
-                                                    className="aspect-square rounded-2xl border-2 border-dashed border-slate-300 hover:border-teal-500 hover:bg-teal-50 transition-all flex flex-col items-center justify-center gap-2 group"
+                                                    className="w-full aspect-video rounded-2xl border-2 border-dashed border-slate-300 hover:border-teal-500 hover:bg-teal-50/50 transition-all flex flex-col items-center justify-center gap-3 group"
                                                 >
-                                                    <Upload className="size-6 text-slate-400 group-hover:text-teal-600 transition-colors" />
-                                                    <span className="text-xs font-medium text-slate-500 group-hover:text-teal-700">Add Media</span>
+                                                    <div className="size-14 bg-slate-100 group-hover:bg-teal-100 rounded-2xl flex items-center justify-center transition-colors">
+                                                        <Camera className="size-7 text-slate-400 group-hover:text-teal-600 transition-colors" />
+                                                    </div>
+                                                    <div className="text-center">
+                                                        <p className="text-sm font-semibold text-slate-600 group-hover:text-teal-700">
+                                                            Click to upload a photo
+                                                        </p>
+                                                        <p className="text-xs text-slate-400 mt-0.5">
+                                                            JPEG, PNG, WEBP, GIF — up to {MAX_SIZE_LABEL}
+                                                        </p>
+                                                    </div>
+                                                    <Upload className="size-4 text-slate-400 group-hover:text-teal-500" />
                                                 </button>
-                                            </div>
+                                            )}
+
                                             <input
                                                 type="file"
-                                                multiple
                                                 className="hidden"
                                                 ref={fileInputRef}
                                                 onChange={handleFileChange}
-                                                accept="image/*,video/*"
+                                                accept="image/*"
                                             />
                                         </div>
 
+                                        {/* Submit */}
                                         <div className="pt-4">
-                                            <Button type="submit" disabled={isSubmitting || !description} className="w-full h-14 bg-slate-900 hover:bg-slate-800 text-white font-bold text-lg rounded-2xl shadow-xl shadow-slate-200 transition-all active:scale-[0.98]">
-                                                {isSubmitting ? <Loader2 className="animate-spin mr-2" /> : <Send className="mr-2" />}
-                                                {isSubmitting ? 'Processing Report...' : 'Submit to Municipal Corporation'}
+                                            <Button
+                                                type="submit"
+                                                disabled={isPending || !description}
+                                                className="w-full h-14 bg-slate-900 hover:bg-slate-800 text-white font-bold text-lg rounded-2xl shadow-xl shadow-slate-200 transition-all active:scale-[0.98]"
+                                            >
+                                                {isPending
+                                                    ? <><Loader2 className="animate-spin mr-2" /> Processing Report...</>
+                                                    : <><Send className="mr-2" /> Submit to Municipal Corporation</>
+                                                }
                                             </Button>
                                             <p className="text-center text-xs text-slate-400 mt-4">
                                                 Submitting artificial reports is a punishable offense. Your report is securely logged with IP and location metadata.
@@ -148,7 +268,7 @@ export default function ReportPollution() {
                             </Card>
                         </div>
 
-                        {/* Map Section */}
+                        {/* ── Map Section ───────────────────────────────────────────────── */}
                         <div className="lg:col-span-2 space-y-6">
                             <Card className="border-0 shadow-md shadow-slate-200/50 rounded-3xl bg-white overflow-hidden h-full flex flex-col">
                                 <div className="p-6 bg-slate-900 text-white shrink-0">
@@ -177,7 +297,9 @@ export default function ReportPollution() {
                                         </div>
                                         <div className="flex-1 overflow-hidden">
                                             <p className="text-[10px] uppercase tracking-wider font-bold text-slate-400">Selected Coordinates</p>
-                                            <p className="text-sm font-mono truncate text-slate-700">{location[0].toFixed(5)}, {location[1].toFixed(5)}</p>
+                                            <p className="text-sm font-mono truncate text-slate-700">
+                                                {location[0].toFixed(5)}, {location[1].toFixed(5)}
+                                            </p>
                                         </div>
                                     </div>
                                 </div>
