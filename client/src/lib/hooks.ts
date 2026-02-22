@@ -2,10 +2,13 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   authApi,
   reportApi,
+  userApi,
   type LoginResponse,
   type SignupResponse,
   type User,
   type SubmitReportPayload,
+  type UserProfile,
+  type HealthProfile,
 } from "./api";
 
 export const useUser = () => {
@@ -71,5 +74,43 @@ export const useMyReports = () => {
     queryKey: ["my-reports"],
     queryFn: () => reportApi.list(),
     staleTime: 2 * 60 * 1000,
+  });
+};
+
+export const useProfile = () => {
+  return useQuery<UserProfile>({
+    queryKey: ["user-profile"],
+    queryFn: userApi.getProfile,
+    enabled: !!localStorage.getItem("access_token"),
+    staleTime: 5 * 60 * 1000,
+  });
+};
+
+export const useUpdateProfile = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: userApi.updateProfile,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["user-profile"] });
+    },
+  });
+};
+
+export const useHealthProfile = () => {
+  return useQuery<HealthProfile | null>({
+    queryKey: ["health-profile"],
+    queryFn: userApi.getHealthProfile,
+    enabled: !!localStorage.getItem("access_token"),
+    staleTime: 5 * 60 * 1000,
+  });
+};
+
+export const useSaveHealthProfile = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: userApi.saveHealthProfile,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["health-profile"] });
+    },
   });
 };

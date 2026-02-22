@@ -143,3 +143,58 @@ export const reportApi = {
     await api.delete(`/user/reports/${reportId}`);
   },
 };
+
+// ─── User Profile & Health ─────────────────────────────────────────────────────
+
+export interface UserProfile {
+  id: number;
+  username: string;
+  email: string;
+  full_name: string | null;
+  phone: string | null;
+  age: number | null;
+  gender: "Male" | "Female" | "Other" | null;
+  address: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface HealthProfile {
+  id: number;
+  user_id: number;
+  has_asthma: boolean;
+  has_copd: boolean;
+  has_allergies: boolean;
+  has_heart_condition: boolean;
+  is_pregnant: boolean;
+  takes_inhaler: boolean;
+  smoking_status: "Never" | "Former" | "Current";
+  fitness_level: "Sedentary" | "Moderate" | "Active";
+  outdoor_exposure: "Low" | "Medium" | "High";
+  breathing_difficulty: "Never" | "Sometimes" | "Often";
+  custom_notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export const userApi = {
+  getProfile: async (): Promise<UserProfile> => {
+    const { data } = await api.get<{ user: UserProfile }>("/user/me");
+    return data.user;
+  },
+
+  updateProfile: async (updates: Partial<Omit<UserProfile, "id" | "username" | "email" | "created_at" | "updated_at">>): Promise<UserProfile> => {
+    const { data } = await api.put<{ user: UserProfile }>("/user/me", updates);
+    return data.user;
+  },
+
+  getHealthProfile: async (): Promise<HealthProfile | null> => {
+    const { data } = await api.get<{ profile: HealthProfile | null }>("/user/health-profile");
+    return data.profile;
+  },
+
+  saveHealthProfile: async (profile: Partial<Omit<HealthProfile, "id" | "user_id" | "created_at" | "updated_at">>): Promise<HealthProfile> => {
+    const { data } = await api.post<{ profile: HealthProfile }>("/user/health-profile", profile);
+    return data.profile;
+  },
+};
