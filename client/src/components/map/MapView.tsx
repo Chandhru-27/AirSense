@@ -23,6 +23,10 @@ interface HeatmapPoint {
     risk: string;
     color: string;
     aqi: number;
+    // optional forecast fields (present when using useForecast)
+    aqi_6h?: number;  risk_6h?: string;
+    aqi_12h?: number; risk_12h?: string;
+    aqi_24h?: number; risk_24h?: string;
 }
 
 interface MapViewProps {
@@ -125,11 +129,33 @@ export default function MapView({
                     }}
                 >
                     <LeafletTooltip>
-                        <div className="bg-white p-2 rounded shadow-lg border border-slate-200">
-                            <p className="font-bold text-slate-800">{point.name}</p>
-                            <p className="text-sm text-slate-500">Risk: <span style={{ color: point.color }}>{point.risk}</span></p>
-                            <p className="text-xs text-slate-400">AQI: {point.aqi}</p>
-                            <p className="text-[10px] text-slate-300 mt-1">{point.lat.toFixed(4)}, {point.lng.toFixed(4)}</p>
+                        <div className="bg-white p-3 rounded-xl shadow-lg border min-w-[180px]" style={{ borderColor: '#DCEBFA' }}>
+                            <p className="font-bold text-sm mb-2" style={{ color: '#2C3E50' }}>{point.name}</p>
+                            <div className="space-y-1">
+                                <div className="flex justify-between items-center text-xs gap-4">
+                                    <span style={{ color: '#8FA6BF' }}>Now</span>
+                                    <span className="font-semibold" style={{ color: point.color }}>{point.risk} · {point.aqi} µg/m³</span>
+                                </div>
+                                {point.aqi_6h != null && (
+                                    <div className="flex justify-between items-center text-xs gap-4">
+                                        <span style={{ color: '#8FA6BF' }}>+6h</span>
+                                        <span className="font-semibold" style={{ color: point.color }}>{point.risk_6h} · {point.aqi_6h} µg/m³</span>
+                                    </div>
+                                )}
+                                {point.aqi_12h != null && (
+                                    <div className="flex justify-between items-center text-xs gap-4">
+                                        <span style={{ color: '#8FA6BF' }}>+12h</span>
+                                        <span className="font-semibold" style={{ color: point.color }}>{point.risk_12h} · {point.aqi_12h} µg/m³</span>
+                                    </div>
+                                )}
+                                {point.aqi_24h != null && (
+                                    <div className="flex justify-between items-center text-xs gap-4">
+                                        <span style={{ color: '#8FA6BF' }}>+24h</span>
+                                        <span className="font-semibold" style={{ color: point.color }}>{point.risk_24h} · {point.aqi_24h} µg/m³</span>
+                                    </div>
+                                )}
+                            </div>
+                            <p className="text-[10px] mt-2" style={{ color: '#8FA6BF' }}>{point.lat.toFixed(4)}, {point.lng.toFixed(4)}</p>
                         </div>
                     </LeafletTooltip>
                 </Circle>

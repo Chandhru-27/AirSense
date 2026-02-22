@@ -16,8 +16,9 @@ interface LocationSearchProps {
 }
 
 const CHENNAI_VIEWBOX = '80.0142,13.1825,80.3198,12.8342';
+const DELHI_VIEWBOX = '76.838,28.882,77.345,28.404';
 
-export default function LocationSearch({ onLocationSelect, className = "", placeholder = "Search for an area in Chennai..." }: LocationSearchProps) {
+export default function LocationSearch({ onLocationSelect, className = "", placeholder = "Search for an area in Chennai or Delhi..." }: LocationSearchProps) {
     const [query, setQuery] = useState('')
     const [suggestions, setSuggestions] = useState<Suggestion[]>([])
     const [isLoading, setIsLoading] = useState(false)
@@ -56,22 +57,25 @@ export default function LocationSearch({ onLocationSelect, className = "", place
         setError(null)
 
         try {
-            const response = await fetch(
-                `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(searchText + ', Chennai')}&format=json&addressdetails=1&limit=5&viewbox=${CHENNAI_VIEWBOX}&bounded=1`,
-                {
-                    signal: abortControllerRef.current.signal,
-                    headers: {
-                        'Accept': 'application/json',
-                        'User-Agent': 'AirSense-App'
-                    }
-                }
-            )
+            const [chennaiRes, delhiRes] = await Promise.all([
+                fetch(
+                    `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(searchText + ', Chennai')}&format=json&addressdetails=1&limit=5&viewbox=${CHENNAI_VIEWBOX}&bounded=1`,
+                    { signal: abortControllerRef.current.signal, headers: { 'Accept': 'application/json', 'User-Agent': 'AirSense-App' } }
+                ),
+                fetch(
+                    `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(searchText + ', Delhi')}&format=json&addressdetails=1&limit=5&viewbox=${DELHI_VIEWBOX}&bounded=1`,
+                    { signal: abortControllerRef.current.signal, headers: { 'Accept': 'application/json', 'User-Agent': 'AirSense-App' } }
+                )
+            ]);
 
-            if (!response.ok) throw new Error('Failed to fetch suggestions')
+            if (!chennaiRes.ok || !delhiRes.ok) throw new Error('Failed to fetch suggestions')
 
-            const data = await response.json()
-            setSuggestions(data)
-            setIsOpen(true)
+            const chennaiData = await chennaiRes.json();
+            const delhiData = await delhiRes.json();
+            
+            const combinedData = [...chennaiData, ...delhiData].slice(0, 5);
+            setSuggestions(combinedData);
+            setIsOpen(true);
         } catch (err: any) {
             if (err.name !== 'AbortError') {
                 setError('Search failed. Please try again.')
@@ -123,7 +127,7 @@ export default function LocationSearch({ onLocationSelect, className = "", place
                     onChange={(e) => setQuery(e.target.value)}
                     onFocus={() => suggestions.length > 0 && setIsOpen(true)}
                     placeholder={placeholder}
-                    className="h-12 pl-12 pr-10 bg-white/95 backdrop-blur-md border-slate-200 shadow-xl rounded-xl focus-visible:ring-teal-500 text-slate-700"
+                    className="h-12 pl-12 pr-10 bg-white/95 backdrop-blur-md border-slate-200 shadow-xl rounded-xs focus-visible:ring-teal-500 text-slate-700"
                 />
 
                 <div className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none">
