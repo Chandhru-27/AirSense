@@ -53,31 +53,9 @@ export default function ChatBot() {
                 </div>
 
                 {/* Chat Interface */}
-                <Card className="flex-1 flex flex-col border-0 shadow-xl shadow-slate-200/50 rounded-3xl overflow-hidden bg-white/80 backdrop-blur-xl">
-                    <CardHeader className="bg-gradient-to-r from-teal-50 to-blue-50 border-b border-slate-100/50 pb-4">
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                                <div className="size-10 bg-teal-100 rounded-full flex items-center justify-center text-teal-600 shadow-sm relative">
-                                    <Bot className="size-5" />
-                                    <span className="absolute bottom-0 right-0 size-2.5 bg-emerald-400 border-2 border-white rounded-full"></span>
-                                </div>
-                                <div>
-                                    <CardTitle className="text-lg">AirSense Assistant</CardTitle>
-                                    <CardDescription className="flex items-center gap-1.5 text-xs">
-                                        <Sparkles className="size-3 text-amber-500" /> Powered by HealthAI
-                                    </CardDescription>
-                                </div>
-                            </div>
+                <Card className="flex-1 flex flex-col border-1 border-black/40 shadow-xl shadow-slate-200/50 rounded-xs overflow-hidden bg-white/80 backdrop-blur-xl">
 
-                            {/* Quick Prompts Container */}
-                            <div className="hidden sm:flex gap-2">
-                                <Badge label="Best time to run?" icon={<Wind className="size-3" />} onClick={() => setInput("When is the best time to go for a run today?")} />
-                                <Badge label="Daily Summary" icon={<Leaf className="size-3" />} onClick={() => setInput("Give me a summary of today's air quality.")} />
-                            </div>
-                        </div>
-                    </CardHeader>
-
-                    <CardContent className="flex-1 overflow-y-auto p-6 space-y-6">
+                    <CardContent className="flex-1  overflow-y-auto p-6 space-y-6">
                         {messages.map((msg, i) => (
                             <div key={i} className={`flex gap-4 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
                                 <div className={`size-8 rounded-full flex items-center justify-center shrink-0 ${msg.role === 'user' ? 'bg-indigo-100 text-indigo-600' : 'bg-teal-100 text-teal-600'
