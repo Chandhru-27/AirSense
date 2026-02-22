@@ -2,63 +2,36 @@ import { useAQIStore, type TimeFrame } from '../stores/aqiStore'
 import { usePersonalizationStore } from '../stores/personalizationStore'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { MapPin, Wind, CloudRain, Sun, Cloud, AlertCircle, Thermometer, Info, Activity } from 'lucide-react'
+import { MapPin, Wind, CloudRain, Sun, Cloud, AlertCircle, Thermometer, Info, Activity, Droplets, CloudDrizzle, Snowflake, CloudLightning, CloudFog } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, BarChart, Bar } from 'recharts'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import MapView from '@/components/map/MapView'
 import LocationSearch from '@/components/map/LocationSearch'
+import { useWeather } from '@/hooks/useWeather'
+import { getWeatherInfo, type WeatherIcon } from '@/lib/weatherCodeMap'
+import { useNearestAQI } from '@/hooks/useNearestAQI'
+import { useForecast, type ForecastHorizon } from '@/hooks/useForecast'
+import { useMemo } from 'react'
 
 // Heatmap and map controllers are now modularized in MapView.tsx
 
-// Chennai Pollution Risk Points
-const chennaiRiskPoints = [
-    { name: "Manali Industrial Zone", lat: 13.1667, lng: 80.2667, risk: "Severe", color: "#ef4444", aqi: 185 },
-    { name: "T. Nagar Commercial Hub", lat: 13.0418, lng: 80.2341, risk: "Medium", color: "#f97316", aqi: 112 },
-    { name: "Adyar Residential Area", lat: 13.0033, lng: 80.2550, risk: "Minimal", color: "#10b981", aqi: 42 },
-    { name: "Ambattur Industrial Estate", lat: 13.1143, lng: 80.1548, risk: "Severe", color: "#ef4444", aqi: 168 },
-    { name: "Marina Beach", lat: 13.0500, lng: 80.2824, risk: "Minimal", color: "#10b981", aqi: 35 },
-    { name: "Guindy Tech Park", lat: 13.0067, lng: 80.2206, risk: "Medium", color: "#f97316", aqi: 95 },
-    { name: "Velachery Junction", lat: 12.9792, lng: 80.2184, risk: "Medium", color: "#f97316", aqi: 125 },
-    { name: "Perungudi Dump Yard", lat: 12.9385, lng: 80.2312, risk: "Severe", color: "#ef4444", aqi: 195 },
-]
 
-const mockWeeklyWeather = [
-    { day: 'Sat', condition: 'Rainy', high: 28, low: 24, icon: CloudRain },
-    { day: 'Sun', condition: 'Partly Cloudy', high: 29, low: 24, icon: Cloud },
-    { day: 'Mon', condition: 'Sunny', high: 29, low: 24, icon: Sun },
-    { day: 'Tue', condition: 'Partly Cloudy', high: 29, low: 23, icon: Sun },
-    { day: 'Wed', condition: 'Partly Cloudy', high: 29, low: 23, icon: Sun },
-    { day: 'Thu', condition: 'Sunny', high: 29, low: 23, icon: Sun },
-    { day: 'Fri', condition: 'Sunny', high: 31, low: 23, icon: Sun },
-    { day: 'Sat', condition: 'Sunny', high: 31, low: 23, icon: Sun },
-]
 
-const weatherTimeline = [
-    { time: '7 pm', temp: 26 },
-    { time: '10 pm', temp: 26 },
-    { time: '1 am', temp: 26 },
-    { time: '4 am', temp: 25 },
-    { time: '7 am', temp: 24 },
-    { time: '10 am', temp: 28 },
-    { time: '1 pm', temp: 29 },
-    { time: '4 pm', temp: 28 },
-]
+function WeatherIcon({ icon, className }: { icon: WeatherIcon; className?: string }) {
+    const props = { className: className ?? 'size-10' }
+    switch (icon) {
+        case 'sunny':         return <Sun {...props} />
+        case 'partly-cloudy': return <Cloud {...props} />
+        case 'cloudy':        return <Cloud {...props} />
+        case 'foggy':         return <CloudFog {...props} />
+        case 'drizzle':       return <CloudDrizzle {...props} />
+        case 'rain':          return <CloudRain {...props} />
+        case 'snow':          return <Snowflake {...props} />
+        case 'storm':         return <CloudLightning {...props} />
+        default:              return <Cloud {...props} />
+    }
+}
 
-const mockAqiHistory = [
-    { time: '6 AM', aqi: 42 },
-    { time: '9 AM', aqi: 55 },
-    { time: '12 PM', aqi: 85 },
-    { time: '3 PM', aqi: 110 },
-    { time: '6 PM', aqi: 95 },
-    { time: '9 PM', aqi: 65 },
-]
-
-const mockPollutants = [
-    { name: 'PM2.5', value: 35, fill: '#14b8a6' }, // Teal
-    { name: 'PM10', value: 45, fill: '#3b82f6' },  // Blue
-    { name: 'NO2', value: 20, fill: '#eab308' },  // Yellow
-    { name: 'CO', value: 15, fill: '#22c55e' },   // Green
-]
 
 export default function Dashboard() {
     const { forecastAQI, selectedTimeFrame, setTimeFrame } = useAQIStore()
@@ -74,7 +47,92 @@ export default function Dashboard() {
     ]
 
     const [location, setLocation] = useState<[number, number] | undefined>(undefined)
-    const [locationName, setLocationName] = useState("Predicting...")
+    const [locationName, setLocationName] = useState("Detecting location...")
+
+    // Reverse-geocode whenever the pinned location changes
+    useEffect(() => {
+        if (!location) return
+        const [lat, lng] = location
+        const controller = new AbortController()
+        fetch(
+            `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`,
+            { signal: controller.signal, headers: { 'Accept-Language': 'en' } }
+        )
+            .then((r) => r.json())
+            .then((data) => {
+                const addr = data.address
+                const name =
+                    addr.suburb ||
+                    addr.neighbourhood ||
+                    addr.city_district ||
+                    addr.town ||
+                    addr.village ||
+                    addr.city ||
+                    addr.county ||
+                    data.display_name?.split(',')[0] ||
+                    'Unknown location'
+                setLocationName(name)
+            })
+            .catch(() => { /* silently ignore abort / network errors */ })
+        return () => controller.abort()
+    }, [location])
+
+    const {
+        current: wxCurrent,
+        hourly: wxHourly,
+        daily: wxDaily,
+        currentHumidity,
+        currentPrecipProb,
+        loading: wxLoading,
+        error: wxError,
+    } = useWeather(location?.[0], location?.[1])
+
+    const { data: aqiData } = useNearestAQI(location?.[0], location?.[1])
+
+    // ── Forecast heatmap ───────────────────────────────────────────────────────
+    const [horizon, setHorizon] = useState<ForecastHorizon>('now')
+    const { heatmapPoints, loading: forecastLoading } = useForecast()
+    const liveHeatmapPoints = heatmapPoints(horizon)
+
+    // Build pollutant chart rows from live API data
+    const pollutants = useMemo(() => [
+        { name: 'PM2.5', value: Math.round(aqiData?.pm25 ?? 0), fill: '#14b8a6' },
+        { name: 'NO2',   value: Math.round(aqiData?.no2  ?? 0), fill: '#eab308' },
+        { name: 'O3',    value: Math.round(aqiData?.o3   ?? 0), fill: '#3b82f6' },
+    ], [aqiData])
+
+    // Build Today's Timeline: current PM2.5 + +6h and +12h forecast from the nearest node
+    const now = new Date()
+
+    const nearestNode = useMemo(() => {
+        if (!location || liveHeatmapPoints.length === 0) return null
+        const [lat, lon] = location
+        return liveHeatmapPoints.reduce((best, pt) =>
+            Math.hypot(pt.lat - lat, pt.lng - lon) < Math.hypot(best.lat - lat, best.lng - lon) ? pt : best
+        )
+    }, [location, liveHeatmapPoints])
+
+    const timelineData = useMemo(() => {
+        const pm25Now = Math.round(aqiData?.pm25 ?? nearestNode?.aqi ?? 0)
+        const pm25_6h  = nearestNode?.aqi_6h  != null ? Math.round(nearestNode.aqi_6h)  : null
+        const pm25_12h = nearestNode?.aqi_12h != null ? Math.round(nearestNode.aqi_12h) : null
+
+        const t = new Date(now)
+        const fmt = (d: Date) => d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
+
+        const rows: { time: string; aqi: number; forecast?: boolean }[] = [
+            { time: fmt(t), aqi: pm25Now, forecast: false },
+        ]
+
+        if (pm25_6h !== null) {
+            rows.push({ time: `+6h (${fmt(new Date(t.getTime() + 6 * 3600_000))})`, aqi: pm25_6h, forecast: true })
+        }
+        if (pm25_12h !== null) {
+            rows.push({ time: `+12h (${fmt(new Date(t.getTime() + 12 * 3600_000))})`, aqi: pm25_12h, forecast: true })
+        }
+
+        return rows
+    }, [aqiData, nearestNode, now.getHours()])
 
     // Generate personalized insights based on Zustand store
     const getInsights = () => {
@@ -130,11 +188,11 @@ export default function Dashboard() {
         return insights
     }
 
-    // Helper
-    function precipitation() { return mockWeeklyWeather[0].condition === 'Rainy' || mockWeeklyWeather[1].condition === 'Rainy' }
+    // Helper — uses live precipitation probability from Open-Meteo
+    function precipitation() { return currentPrecipProb >= 30 }
 
     return (
-        <div className="flex flex-col min-h-screen bg-slate-50/50 pb-12">
+        <div className="flex flex-col min-h-screen pb-12" style={{ backgroundColor: '#F4F9FF' }}>
 
             {/* 1. Fullscreen Heatmap Section */}
             <section className="relative w-full h-[100vh] min-h-[600px] bg-slate-900 overflow-hidden shrink-0">
@@ -142,7 +200,7 @@ export default function Dashboard() {
                     <MapView
                         center={location}
                         heatmapRequired={true}
-                        heatmapPoints={chennaiRiskPoints}
+                        heatmapPoints={forecastLoading ? [] : liveHeatmapPoints}
                         showUserLocation={true}
                         onLocationSelect={(lat, lng) => setLocation([lat, lng])}
                     />
@@ -160,7 +218,7 @@ export default function Dashboard() {
                     {/* Top Bar: Location & Status */}
                     <div className="flex items-start justify-between gap-4">
                         <div className="flex flex-col gap-4 pointer-events-auto max-w-md w-full">
-                            <div className="flex items-center gap-3 bg-white/10 backdrop-blur-md px-4 py-2.5 rounded-full border border-white/20 shadow-lg">
+                            <div className="flex items-center gap-3 bg-white/10 backdrop-blur-md px-4 py-2.5 rounded-xs border border-white/20 shadow-lg">
                                 <MapPin className="text-teal-400 size-5" />
                                 <div>
                                     <h2 className="text-white font-semibold text-lg leading-none group-data-[collapsible=icon]:hidden">{locationName === "Predicting..." ? "Your Location" : locationName}</h2>
@@ -177,42 +235,13 @@ export default function Dashboard() {
                                 className="z-[3000]"
                             />
                         </div>
-
-                        {/* Floating AQI Badge */}
-                        <div className="flex flex-col items-end pointer-events-auto">
-                            <div className="bg-white/10 backdrop-blur-xl border border-white/20 p-6 rounded-3xl shadow-2xl flex flex-col items-center">
-                                <span className="text-slate-200 text-sm font-medium uppercase tracking-wider mb-2">City avg AQI</span>
-                                <span className={`text-6xl font-black ${currentAQIData.color === 'green' ? 'text-emerald-400' : currentAQIData.color === 'yellow' ? 'text-amber-400' : currentAQIData.color === 'orange' ? 'text-orange-400' : 'text-rose-500'}`}>
-                                    {currentAQIData.value}
-                                </span>
-                                <span className="text-white font-medium mt-3 bg-white/10 px-3 py-1 rounded-full text-sm">
-                                    {currentAQIData.label}
-                                </span>
-                            </div>
-                        </div>
                     </div>
 
                     {/* Bottom Bar: Timeframe Toggles */}
                     <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-16 pointer-events-none">
                         <div className="flex-1 max-w-xl">
-                            <h3 className="text-5xl font-black text-teal-400 mb-3 drop-shadow-[0_2px_10px_rgba(0,0,0,0.5)]">Forecast Prediction</h3>
-                            <p className="text-white font-semibold drop-shadow-[0_1px_5px_rgba(0,0,0,0.5)] pb-6 text-xl leading-relaxed">Scroll down to see detailed forecasting, personalized insights, and your health metrics.</p>
-                        </div>
-
-                        <div className="bg-white/90 backdrop-blur-md p-1.5 rounded-2xl shadow-xl border border-white/40 flex gap-1 self-start md:self-auto pointer-events-auto">
-                            {timeFrames.map((tf) => (
-                                <Button
-                                    key={tf.value}
-                                    variant={selectedTimeFrame === tf.value ? 'default' : 'ghost'}
-                                    onClick={() => setTimeFrame(tf.value)}
-                                    className={`rounded-xl px-5 font-semibold transition-all ${selectedTimeFrame === tf.value
-                                        ? 'bg-slate-900 text-white shadow-md'
-                                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-                                        }`}
-                                >
-                                    {tf.label}
-                                </Button>
-                            ))}
+                            {/* <h3 className="text-5xl font-black text-teal-400 mb-3 drop-shadow-[0_2px_10px_rgba(0,0,0,0.5)]">Forecast Prediction</h3> */}
+                            {/* <p className="text-blue-900 font-semibold drop-shadow-[0_1px_5px_rgba(0,0,0,0.5)] pb-6 text-xl leading-relaxed w-dvw ">Scroll down to see detailed forecasting, personalized insights, and your health metrics.</p> */}
                         </div>
                     </div>
                 </div>
@@ -223,89 +252,150 @@ export default function Dashboard() {
 
                 {/* Weather Animation Row */}
                 {/* Weather Hub Section */}
-                <Card className="border-0 shadow-2xl rounded-[32px] overflow-hidden bg-[#1e1e1e] text-white">
+                <Card className="border-0 shadow-2xl rounded-xs overflow-hidden text-white" style={{ backgroundColor: '#2C3E50' }}>
                     <CardContent className="p-0">
-                        {/* Top Weather Info */}
-                        <div className="p-8 lg:p-12 flex flex-col lg:flex-row lg:items-center justify-between gap-8">
-                            <div className="flex items-center gap-6">
-                                <div className="relative">
-                                    <Sun className="size-20 text-yellow-500 fill-yellow-500/20" />
-                                    <Cloud className="size-12 text-slate-400 absolute -bottom-2 -right-2" />
+                        {wxLoading ? (
+                            /* Loading skeleton */
+                            <div className="p-8 lg:p-12 flex flex-col gap-6 animate-pulse">
+                                <div className="flex items-center gap-6">
+                                    <div className="size-20 rounded-xs bg-white/10" />
+                                    <div className="space-y-3">
+                                        <div className="h-16 w-40 bg-white/10 rounded-xl" />
+                                        <div className="h-4 w-64 bg-white/10 rounded-lg" />
+                                    </div>
                                 </div>
-                                <div>
-                                    <div className="flex items-baseline gap-2">
-                                        <span className="text-8xl font-medium tracking-tighter">26</span>
-                                        <div className="text-2xl font-light text-slate-400 flex gap-2">
-                                            <span className="text-white font-normal">°C</span>
-                                            <span>|</span>
-                                            <span>°F</span>
+                                <div className="h-[200px] w-full bg-white/5 rounded-xs" />
+                                <div className="grid grid-cols-7 gap-4">
+                                    {Array.from({ length: 7 }).map((_, i) => (
+                                        <div key={i} className="h-28 bg-white/5 rounded-xs" />
+                                    ))}
+                                </div>
+                            </div>
+                        ) : wxError ? (
+                            /* Error state */
+                            <div className="p-8 lg:p-12 flex flex-col items-center justify-center gap-4 min-h-[320px] text-center">
+                                <AlertCircle className="size-12 text-rose-400" />
+                                <h3 className="text-xl font-semibold text-white">Weather Unavailable</h3>
+                                <p className="text-slate-400 max-w-sm">{wxError}</p>
+                            </div>
+                        ) : (
+                            <>
+                                {/* Top Weather Info */}
+                                <div className="p-8 lg:p-12 flex flex-col lg:flex-row lg:items-center justify-between gap-8">
+                                    <div className="flex items-center gap-6">
+                                        <div className="relative">
+                                            <WeatherIcon
+                                                icon={getWeatherInfo(wxCurrent?.weathercode ?? 0).icon}
+                                                className={`size-20 ${
+                                                    getWeatherInfo(wxCurrent?.weathercode ?? 0).icon === 'sunny'
+                                                        ? 'text-yellow-400 fill-yellow-400/20'
+                                                        : getWeatherInfo(wxCurrent?.weathercode ?? 0).icon === 'rain' || getWeatherInfo(wxCurrent?.weathercode ?? 0).icon === 'drizzle'
+                                                        ? 'text-blue-400'
+                                                        : getWeatherInfo(wxCurrent?.weathercode ?? 0).icon === 'storm'
+                                                        ? 'text-purple-400'
+                                                        : getWeatherInfo(wxCurrent?.weathercode ?? 0).icon === 'snow'
+                                                        ? 'text-sky-200'
+                                                        : 'text-slate-400'
+                                                }`}
+                                            />
+                                        </div>
+                                        <div>
+                                            <div className="flex items-baseline gap-2">
+                                                <span className="text-8xl font-medium tracking-tighter">{wxCurrent?.temperature ?? '--'}</span>
+                                                <div className="text-2xl font-light text-slate-400 flex gap-2">
+                                                    <span className="text-white font-normal">°C</span>
+                                                </div>
+                                            </div>
+                                            <div className="flex flex-wrap gap-4 text-slate-400 text-sm mt-2">
+                                                <span className="flex items-center gap-1.5">
+                                                    <CloudRain className="size-4" />
+                                                    Precipitation: {currentPrecipProb}%
+                                                </span>
+                                                <span className="flex items-center gap-1.5">
+                                                    <Droplets className="size-4" />
+                                                    Humidity: {currentHumidity}%
+                                                </span>
+                                                <span className="flex items-center gap-1.5">
+                                                    <Wind className="size-4" />
+                                                    Wind: {wxCurrent?.windspeed ?? '--'} km/h
+                                                </span>
+                                            </div>
                                         </div>
                                     </div>
-                                    <div className="flex gap-4 text-slate-400 text-sm mt-2">
-                                        <span>Precipitation: 8%</span>
-                                        <span>Humidity: 79%</span>
-                                        <span>Wind: 18 km/h</span>
+                                    <div className="text-right">
+                                        <h2 className="text-5xl font-light tracking-tight">Weather</h2>
+                                        <p className="text-slate-400 mt-1 text-lg">{locationName}</p>
+                                        <p className="text-slate-400 font-medium mt-1">
+                                            {getWeatherInfo(wxCurrent?.weathercode ?? 0).description}
+                                        </p>
                                     </div>
                                 </div>
-                            </div>
-                            <div className="text-right">
-                                <h2 className="text-5xl font-light tracking-tight">Weather</h2>
-                                <p className="text-slate-400 mt-1 text-lg">Saturday, 6:00 pm</p>
-                                <p className="text-slate-400 font-medium">Clear with periodic clouds</p>
-                            </div>
-                        </div>
 
-                        {/* Tabs */}
-                        <div className="px-8 lg:px-12 flex gap-8 text-lg font-medium border-b border-white/5">
-                            <button className="pb-4 border-b-2 border-yellow-500 text-white">Temperature</button>
-                            <button className="pb-4 text-slate-500 hover:text-slate-300">Precipitation</button>
-                            <button className="pb-4 text-slate-500 hover:text-slate-300">Wind</button>
-                        </div>
+                                {/* Tabs (static label, chart is always temperature) */}
+                                <div className="px-8 lg:px-12 flex gap-8 text-lg font-medium border-b border-white/5">
+                                    <button className="pb-4 border-b-2 border-yellow-500 text-white">Temperature</button>
+                                </div>
 
-                        {/* Temperature Chart */}
-                        <div className="p-4 lg:p-12 pb-4">
-                            <div className="h-[200px] w-full relative">
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <LineChart data={weatherTimeline}>
-                                        <XAxis dataKey="time" hide />
-                                        <YAxis hide domain={['dataMin - 5', 'dataMax + 5']} />
-                                        <Line
-                                            type="monotone"
-                                            dataKey="temp"
-                                            stroke="#facc15"
-                                            strokeWidth={3}
-                                            dot={{ fill: '#facc15', r: 0 }}
-                                            activeDot={{ r: 6 }}
-                                            label={(props: any) => (
-                                                <text x={props.x} y={props.y - 15} fill="#fff" fontSize={12} textAnchor="middle" fontWeight="bold">
-                                                    {props.value}
-                                                </text>
-                                            )}
-                                        />
-                                    </LineChart>
-                                </ResponsiveContainer>
-                                <div className="absolute inset-x-12 bottom-0 h-2 bg-gradient-to-r from-yellow-500/20 via-yellow-500/5 to-transparent rounded-full" />
-                            </div>
-                            <div className="flex justify-between px-4 lg:px-12 mt-4 text-slate-500 text-sm font-medium">
-                                {weatherTimeline.map((item, idx) => (
-                                    <span key={idx}>{item.time}</span>
-                                ))}
-                            </div>
-                        </div>
-
-                        {/* 7-Day Forecast */}
-                        <div className="p-6 lg:p-10 border-t border-white/5 grid grid-cols-4 lg:grid-cols-8 gap-4">
-                            {mockWeeklyWeather.map((day, i) => (
-                                <div key={i} className={`flex flex-col items-center gap-4 p-4 rounded-3xl transition-all ${i === 0 ? 'bg-white/5 border border-white/10' : 'hover:bg-white/5'}`}>
-                                    <span className="font-bold text-lg">{day.day}</span>
-                                    <day.icon className={`size-10 ${i === 0 ? 'text-blue-400' : 'text-yellow-500'}`} />
-                                    <div className="flex flex-col items-center">
-                                        <span className="font-bold text-xl">{day.high}°</span>
-                                        <span className="text-slate-500 font-medium">{day.low}°</span>
+                                {/* Temperature Chart — next 8 hours */}
+                                <div className="p-4 lg:p-12 pb-4">
+                                    <div className="h-[200px] w-full relative">
+                                        <ResponsiveContainer width="100%" height="100%">
+                                            <LineChart data={wxHourly}>
+                                                <XAxis dataKey="time" hide />
+                                                <YAxis hide domain={['dataMin - 5', 'dataMax + 5']} />
+                                                <Line
+                                                    type="monotone"
+                                                    dataKey="temp"
+                                                    stroke="#facc15"
+                                                    strokeWidth={3}
+                                                    dot={{ fill: '#facc15', r: 0 }}
+                                                    activeDot={{ r: 6 }}
+                                                    label={(props: any) => (
+                                                        <text x={props.x} y={props.y - 15} fill="#fff" fontSize={12} textAnchor="middle" fontWeight="bold">
+                                                            {props.value}°
+                                                        </text>
+                                                    )}
+                                                />
+                                            </LineChart>
+                                        </ResponsiveContainer>
+                                        <div className="absolute inset-x-12 bottom-0 h-2 bg-gradient-to-r from-yellow-500/20 via-yellow-500/5 to-transparent rounded-full" />
+                                    </div>
+                                    <div className="flex justify-between px-4 lg:px-12 mt-4 text-slate-500 text-sm font-medium">
+                                        {wxHourly.map((item, idx) => (
+                                            <span key={idx}>{item.time}</span>
+                                        ))}
                                     </div>
                                 </div>
-                            ))}
-                        </div>
+
+                                {/* 7-Day Forecast */}
+                                <div className="p-6 lg:p-10 border-t border-white/5 grid grid-cols-4 lg:grid-cols-7 gap-4">
+                                    {wxDaily.map((day, i) => {
+                                        const info = getWeatherInfo(day.weathercode)
+                                        return (
+                                            <div key={i} className={`flex flex-col items-center gap-4 p-4 rounded-xs transition-all ${
+                                                i === 0 ? 'bg-white/5 border border-white/10' : 'hover:bg-white/5'
+                                            }`}>
+                                                <span className="font-bold text-lg">{day.day}</span>
+                                                <WeatherIcon
+                                                    icon={info.icon}
+                                                    className={`size-10 ${
+                                                        info.icon === 'sunny' ? 'text-yellow-400'
+                                                        : info.icon === 'rain' || info.icon === 'drizzle' ? 'text-blue-400'
+                                                        : info.icon === 'storm' ? 'text-purple-400'
+                                                        : info.icon === 'snow' ? 'text-sky-200'
+                                                        : 'text-slate-400'
+                                                    }`}
+                                                />
+                                                <div className="flex flex-col items-center">
+                                                    <span className="font-bold text-xl">{day.tempMax}°</span>
+                                                    <span className="text-slate-500 font-medium">{day.tempMin}°</span>
+                                                </div>
+                                            </div>
+                                        )
+                                    })}
+                                </div>
+                            </>
+                        )}
                     </CardContent>
                 </Card>
 
@@ -313,31 +403,55 @@ export default function Dashboard() {
 
                     {/* Main Analytics Column */}
                     <div className="lg:col-span-2 space-y-8">
-                        <Card className="border-0 shadow-lg shadow-slate-200/40 rounded-3xl overflow-hidden">
+                        <Card className="border-0 shadow-lg shadow-slate-200/40 rounded-xs overflow-hidden">
                             <CardHeader className="bg-white pb-2">
                                 <CardTitle className="flex items-center gap-2 text-xl">
                                     <Activity className="text-teal-500" />
                                     Today's Timeline
                                 </CardTitle>
-                                <CardDescription>Hourly particulate matter concentration (PM2.5)</CardDescription>
+                                <CardDescription className="flex items-center gap-4 mt-1">
+                                    Hourly PM2.5 concentration (µg/m³)
+                                    <span className="flex items-center gap-1.5 text-xs">
+                                        <span className="inline-block w-6 h-0.5 rounded bg-[#14b8a6]" /> Now
+                                        <span className="inline-block w-6 h-0.5 rounded border-t-2 border-dashed border-[#f97316]" /> +6h forecast
+                                        <span className="inline-block w-6 h-0.5 rounded border-t-2 border-dashed border-[#3b82f6]" /> +12h forecast
+                                    </span>
+                                </CardDescription>
                             </CardHeader>
                             <CardContent className="bg-white pt-4">
                                 <div className="h-[250px] w-full">
                                     <ResponsiveContainer width="100%" height="100%">
-                                        <LineChart data={mockAqiHistory} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
+                                        <LineChart data={timelineData} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
                                             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                                            <XAxis dataKey="time" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 12 }} dy={10} />
+                                            <XAxis dataKey="time" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 11 }} dy={10} />
                                             <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 12 }} />
                                             <RechartsTooltip
                                                 contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
                                             />
+                                            {/* Single connected line — Now → +6h → +12h */}
                                             <Line
                                                 type="monotone"
                                                 dataKey="aqi"
+                                                name="PM2.5 (µg/m³)"
                                                 stroke="#14b8a6"
-                                                strokeWidth={4}
-                                                dot={{ r: 4, strokeWidth: 2, fill: '#fff' }}
-                                                activeDot={{ r: 8, fill: '#14b8a6', stroke: '#fff', strokeWidth: 3 }}
+                                                strokeWidth={3}
+                                                dot={(props: any) => {
+                                                    const isForecast = props.payload?.forecast
+                                                    return (
+                                                        <circle
+                                                            key={props.key}
+                                                            cx={props.cx}
+                                                            cy={props.cy}
+                                                            r={5}
+                                                            fill={isForecast ? '#fff' : '#14b8a6'}
+                                                            stroke="#14b8a6"
+                                                            strokeWidth={2}
+                                                            strokeDasharray={isForecast ? '3 2' : '0'}
+                                                        />
+                                                    )
+                                                }}
+                                                activeDot={{ r: 7, fill: '#14b8a6', stroke: '#fff', strokeWidth: 3 }}
+                                                connectNulls
                                             />
                                         </LineChart>
                                     </ResponsiveContainer>
@@ -345,7 +459,7 @@ export default function Dashboard() {
                             </CardContent>
                         </Card>
 
-                        <Card className="border-0 shadow-lg shadow-slate-200/40 rounded-3xl overflow-hidden">
+                        <Card className="border-0 shadow-lg shadow-slate-200/40 rounded-xs overflow-hidden">
                             <CardHeader className="bg-white pb-2 flex flex-row items-center justify-between">
                                 <div>
                                     <CardTitle className="flex items-center gap-2 text-xl">
@@ -358,7 +472,7 @@ export default function Dashboard() {
                             <CardContent className="bg-white pt-4">
                                 <div className="h-[200px] w-full">
                                     <ResponsiveContainer width="100%" height="100%">
-                                        <BarChart data={mockPollutants} margin={{ top: 0, right: 0, left: -20, bottom: 0 }} layout="vertical">
+                                        <BarChart data={pollutants} margin={{ top: 0, right: 0, left: -20, bottom: 0 }} layout="vertical">
                                             <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="#e2e8f0" />
                                             <XAxis type="number" hide />
                                             <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} tick={{ fill: '#475569', fontWeight: 600, fontSize: 13 }} />
@@ -378,8 +492,8 @@ export default function Dashboard() {
 
                     {/* Right Column: Personalized Insights */}
                     <div className="space-y-6">
-                        <div className="bg-gradient-to-br from-indigo-900 to-slate-900 rounded-3xl p-6 text-white shadow-xl relative overflow-hidden">
-                            <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full blur-2xl -translate-y-1/2 translate-x-1/3"></div>
+                        <div className="rounded-xs p-6 text-white shadow-xl relative overflow-hidden" style={{ background: 'linear-gradient(135deg, #5F9EC0, #89B6E3)' }}>
+                            <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-xs blur-2xl -translate-y-1/2 translate-x-1/3"></div>
 
                             <div className="flex items-center gap-3 mb-6 relative z-10">
                                 <div className="bg-white/20 p-2 rounded-xl backdrop-blur-sm">
@@ -420,8 +534,8 @@ export default function Dashboard() {
                         </div>
 
                         {/* Profile Context Card */}
-                        <Card className="border-0 shadow-md shadow-slate-200/50 rounded-3xl bg-white overflow-hidden">
-                            <div className="h-2 w-full bg-gradient-to-r from-teal-400 to-blue-500" />
+                        <Card className="border shadow-md rounded-3xl bg-white overflow-hidden" style={{ borderColor: '#DCEBFA', boxShadow: '0 4px 12px rgba(167,199,231,0.25)' }}>
+                            <div className="h-2 w-full" style={{ background: 'linear-gradient(135deg, #A7C7E7, #89B6E3)' }} />
                             <CardContent className="p-6">
                                 <h4 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4">Active Profile</h4>
                                 <div className="flex flex-wrap gap-2">
