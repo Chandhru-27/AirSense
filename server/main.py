@@ -25,7 +25,7 @@ def create_app():
 
     jwt = JWTManager(app)
 
-    limiter.init_app(app=app)
+    # limiter.init_app(app=app)
 
     # CORS config for endpoint access
     CORS(
@@ -43,9 +43,13 @@ def create_app():
     # Import and register blueprints here to avoid circular imports
     from auth.routes import auth_bp
     from user.routes import user_bp
+    from maps.routes import maps_bp
+    from trips.routes import trips_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(user_bp)
+    app.register_blueprint(maps_bp)
+    app.register_blueprint(trips_bp)
 
     # Security headers configuration
     @app.after_request

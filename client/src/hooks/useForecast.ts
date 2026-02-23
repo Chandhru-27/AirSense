@@ -51,15 +51,20 @@ export function useForecast(): UseForecastReturn {
     setLoading(true)
     setError(null)
 
-    api.get<{ status: string; data: ForecastNode[] }>('/maps/forecast')
+    api.get<{ status: string; data: ForecastNode[] }>('/maps/forecast', { timeout: 30000 })
       .then(({ data }) => {
         if (!cancelled) {
-          setNodes(data.data ?? [])
+          const nodes = data.data ?? []
+          if (nodes.length === 0) {
+            console.warn('[useForecast] API returned 0 nodes — check if air_quality_data table has rows')
+          }
+          setNodes(nodes)
           setLoading(false)
         }
       })
       .catch((err: Error) => {
         if (!cancelled) {
+          console.error('[useForecast] Failed to load forecast data:', err.message)
           setError(err.message || 'Failed to fetch forecast data')
           setLoading(false)
         }

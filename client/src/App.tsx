@@ -19,21 +19,22 @@ import { useUser } from './lib/hooks'
 import { useAuthStore } from './stores/authStore'
 
 function App() {
-  const { data: userData, isLoading: isUserLoading } = useUser();
+  const { data: userData, isLoading: isUserLoading, isError: isUserError } = useUser();
   const { login, logout, isAuthenticated } = useAuthStore();
   const hasToken = !!localStorage.getItem('access_token');
 
   useEffect(() => {
-    if (userData && !isAuthenticated) {
+    if (userData) {
+      // Always sync the Zustand store with fresh API data
       login(
         { id: userData.user_id, name: userData.username || 'User', email: userData.email || '' },
         localStorage.getItem('access_token') || ''
       );
-    } else if (!userData && !isUserLoading && isAuthenticated) {
-      // If query fails and we thought we were authenticated, logout
+    } else if (isUserError && !isUserLoading && isAuthenticated) {
+      // Only force logout on a real API error (e.g. 401), not on a temporary loading state
       logout();
     }
-  }, [userData, isUserLoading, login, logout, isAuthenticated]);
+  }, [userData, isUserLoading, isUserError, login, logout, isAuthenticated]);
 
   if (hasToken && isUserLoading) {
     return (

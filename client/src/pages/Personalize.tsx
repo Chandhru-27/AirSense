@@ -1,216 +1,432 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { usePersonalizationStore } from '../stores/personalizationStore'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
+import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
-import { Map, Wind, Activity, ChevronRight, ChevronLeft, HeartPulse, User } from 'lucide-react'
+import { Map, ChevronRight, ChevronLeft, Loader2, User, HeartPulse, Wind, Activity, CheckCircle2 } from 'lucide-react'
+import { useUpdateProfile, useSaveHealthProfile } from '../lib/hooks'
 
-// Define the steps and their fields
-const steps = [
-    {
-        id: 'category',
-        title: 'Who are you?',
-        subtitle: 'Help us tailor your air quality recommendations.',
-        options: [
-            { value: 'Normal Adult', label: 'Normal Adult', icon: User },
-            { value: 'Elderly', label: 'Elderly (65+)', icon: User },
-            { value: 'Pregnant', label: 'Pregnant', icon: HeartPulse },
-            { value: 'Asthma Patient', label: 'Asthma Patient', icon: Wind },
-            { value: 'Outdoor Worker', label: 'Outdoor Worker', icon: Activity },
-        ]
-    },
-    {
-        id: 'breathing',
-        title: 'Respiratory Health',
-        subtitle: 'Do you experience breathing difficulties frequently?',
-        options: [
-            { value: 'yes', label: 'Yes, often', icon: HeartPulse },
-            { value: 'sometimes', label: 'Sometimes', icon: Wind },
-            { value: 'no', label: 'No, rarely or never', icon: Activity },
-        ]
-    },
-    {
-        id: 'outdoor',
-        title: 'Outdoor Activity',
-        subtitle: 'How frequently are you outdoors?',
-        options: [
-            { value: 'high', label: 'Most of the day', icon: Activity },
-            { value: 'medium', label: 'A few hours a day', icon: User },
-            { value: 'low', label: 'Rarely (mostly indoors)', icon: HeartPulse },
-        ]
-    },
-    {
-        id: 'fitness',
-        title: 'Fitness Level',
-        subtitle: 'How would you describe your fitness level?',
-        options: [
-            { value: 'Active', label: 'Active (Exercise regularly)', icon: Activity },
-            { value: 'Moderate', label: 'Moderate (Occasional exercise)', icon: User },
-            { value: 'Sedentary', label: 'Sedentary (Little to no exercise)', icon: HeartPulse },
-        ]
-    },
-    {
-        id: 'final',
-        title: 'Almost done!',
-        subtitle: 'Anything else we should know?',
-    }
-]
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+interface PersonalData {
+    full_name: string
+    phone: string
+    age: string
+    gender: 'Male' | 'Female' | 'Other' | ''
+    address: string
+}
+
+interface HealthData {
+    // Respiratory
+    has_asthma: boolean | null
+    has_copd: boolean | null
+    has_allergies: boolean | null
+    // Cardiovascular
+    has_heart_condition: boolean | null
+    // Special
+    is_pregnant: boolean | null
+    takes_inhaler: boolean | null
+    // Lifestyle
+    smoking_status: 'Never' | 'Former' | 'Current' | ''
+    fitness_level: 'Sedentary' | 'Moderate' | 'Active' | ''
+    outdoor_exposure: 'Low' | 'Medium' | 'High' | ''
+    // Breathing
+    breathing_difficulty: 'Never' | 'Sometimes' | 'Often' | ''
+    // Notes
+    custom_notes: string
+}
+
+// ─── Helper Components ────────────────────────────────────────────────────────
+
+function BoolQuestion({
+    label,
+    value,
+    onChange,
+}: {
+    label: string
+    value: boolean | null
+    onChange: (v: boolean) => void
+}) {
+    return (
+        <div className="space-y-2">
+            <p className="text-sm font-semibold text-slate-700">{label}</p>
+            <div className="flex gap-3">
+                {([true, false] as const).map((v) => (
+                    <button
+                        key={String(v)}
+                        type="button"
+                        onClick={() => onChange(v)}
+                        className={`flex-1 py-3 rounded-xl text-sm font-semibold border-2 transition-all ${value === v
+                            ? v
+                                ? 'bg-teal-50 border-teal-500 text-teal-700'
+                                : 'bg-slate-50 border-slate-400 text-slate-700'
+                            : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300'
+                            }`}
+                    >
+                        {v ? 'Yes' : 'No'}
+                    </button>
+                ))}
+            </div>
+        </div>
+    )
+}
+
+// ─── Phase definitions ────────────────────────────────────────────────────────
+
+const TOTAL_STEPS = 7  // Phase 1: 1 step | Phase 2: 5 steps + summary
+const PHASE2_START = 1
+
+// ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function Personalize() {
-    const [currentStep, setCurrentStep] = useState(0)
-    const [answers, setAnswers] = useState<Record<string, any>>({
-        category: '',
-        breathing: '',
-        outdoor: '',
-        fitness: '',
-        notes: ''
+    const navigate = useNavigate()
+    const { mutateAsync: updateProfile, isPending: savingProfile } = useUpdateProfile()
+    const { mutateAsync: saveHealth, isPending: savingHealth } = useSaveHealthProfile()
+
+    const [step, setStep] = useState(0)
+    const [error, setError] = useState<string | null>(null)
+
+    const [personal, setPersonal] = useState<PersonalData>({
+        full_name: '', phone: '', age: '', gender: '', address: '',
     })
 
-    const navigate = useNavigate()
-    const { setAnswers: saveAnswersToStore } = usePersonalizationStore()
+    const [health, setHealth] = useState<HealthData>({
+        has_asthma: null, has_copd: null, has_allergies: null,
+        has_heart_condition: null,
+        is_pregnant: null, takes_inhaler: null,
+        smoking_status: '', fitness_level: '', outdoor_exposure: '',
+        breathing_difficulty: '', custom_notes: '',
+    })
 
-    const currentStepData = steps[currentStep]
+    const isLastStep = step === TOTAL_STEPS - 1
 
-    const handleNext = () => {
-        if (currentStep < steps.length - 1) {
-            setCurrentStep(curr => curr + 1)
-        } else {
-            // Final step submit
-            saveAnswersToStore({
-                medicalCategory: answers.category,
-                asthma: answers.category === 'Asthma Patient' || answers.breathing === 'yes',
-                pregnancy: answers.category === 'Pregnant',
-                fitnessLevel: answers.fitness,
-                customNotes: answers.notes,
-                ageGroup: answers.category === 'Elderly' ? '65+' : '18-64', // derived mock
-            })
-            navigate('/dashboard')
+    // ── Validation ──────────────────────────────────────────────────────────
+
+    const canProceed = (): boolean => {
+        if (step === 0) return !!personal.full_name.trim() && !!personal.gender
+        if (step === 1) return health.has_asthma !== null && health.has_copd !== null && health.has_allergies !== null
+        if (step === 2) return health.has_heart_condition !== null
+        if (step === 3) return health.is_pregnant !== null && health.takes_inhaler !== null
+        if (step === 4) return !!health.smoking_status && !!health.fitness_level && !!health.outdoor_exposure
+        if (step === 5) return !!health.breathing_difficulty
+        return true
+    }
+
+    // ── Navigation ──────────────────────────────────────────────────────────
+
+    const handleNext = async () => {
+        setError(null)
+
+        if (step === 0) {
+            // Save personal info before going to health questions
+            try {
+                await updateProfile({
+                    full_name: personal.full_name || undefined,
+                    phone: personal.phone || undefined,
+                    age: personal.age ? parseInt(personal.age) : undefined,
+                    gender: personal.gender || undefined,
+                    address: personal.address || undefined,
+                })
+            } catch {
+                setError('Failed to save personal info. Please try again.')
+                return
+            }
         }
+
+        if (isLastStep) {
+            // Save health profile, then go to dashboard
+            try {
+                const payload: any = {
+                    has_asthma: health.has_asthma ?? false,
+                    has_copd: health.has_copd ?? false,
+                    has_allergies: health.has_allergies ?? false,
+                    has_heart_condition: health.has_heart_condition ?? false,
+                    is_pregnant: health.is_pregnant ?? false,
+                    takes_inhaler: health.takes_inhaler ?? false,
+                    smoking_status: health.smoking_status || 'Never',
+                    fitness_level: health.fitness_level || 'Moderate',
+                    outdoor_exposure: health.outdoor_exposure || 'Medium',
+                    breathing_difficulty: health.breathing_difficulty || 'Never',
+                    custom_notes: health.custom_notes || null,
+                }
+                await saveHealth(payload)
+                navigate('/dashboard')
+            } catch {
+                setError('Failed to save health profile. Please try again.')
+            }
+            return
+        }
+
+        setStep(s => s + 1)
     }
 
     const handleBack = () => {
-        if (currentStep > 0) {
-            setCurrentStep(curr => curr - 1)
-        }
+        setError(null)
+        setStep(s => s - 1)
     }
 
-    const canProceed = () => {
-        if (currentStepData.id === 'final') return true
-        return !!answers[currentStepData.id]
-    }
+    const phase = step < PHASE2_START + 1 ? 1 : 2
+    const isPending = savingProfile || savingHealth
+
+    // ── Step titles & icons ─────────────────────────────────────────────────
+    const stepMeta = [
+        { title: 'Your Personal Details', subtitle: 'Help us personalize your profile.', icon: User },
+        { title: 'Respiratory Health', subtitle: 'Do you suffer from any breathing-related conditions?', icon: Wind },
+        { title: 'Cardiovascular Health', subtitle: 'Heart conditions affect how you should respond to pollution spikes.', icon: HeartPulse },
+        { title: 'Special Conditions', subtitle: 'Pregnancy and inhaler use impact your pollution sensitivity.', icon: HeartPulse },
+        { title: 'Lifestyle', subtitle: 'Your daily habits help us tailor alerts and recommendations.', icon: Activity },
+        { title: 'Breathing Patterns', subtitle: 'How often do you experience shortness of breath?', icon: Wind },
+        { title: 'Anything else?', subtitle: 'Final step — optional notes and a summary of your profile.', icon: CheckCircle2 },
+    ]
+
+    const { title, subtitle, icon: StepIcon } = stepMeta[step]
 
     return (
         <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
-            {/* Decorative Background */}
+            {/* Decorative background */}
             <div className="fixed inset-0 overflow-hidden pointer-events-none">
-                <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-teal-400/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3"></div>
-                <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-blue-400/10 rounded-full blur-3xl translate-y-1/3 -translate-x-1/3"></div>
+                <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-teal-400/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3" />
+                <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-blue-400/10 rounded-full blur-3xl translate-y-1/3 -translate-x-1/3" />
             </div>
 
             <div className="w-full max-w-2xl relative z-10">
+                {/* Header */}
                 <div className="text-center mb-8">
                     <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-teal-100 text-teal-600 mb-4 shadow-sm">
                         <Map className="size-8" />
                     </div>
-                    <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Let's Personalize AirSense</h1>
-                    <p className="text-slate-500 mt-2 text-lg">Help us customize your air quality insights.</p>
+                    <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Set Up Your AirSense Profile</h1>
+                    <p className="text-slate-500 mt-2 text-base">
+                        Phase {phase} of 2 — {phase === 1 ? 'Personal Information' : 'Health Questionnaire'}
+                    </p>
                 </div>
 
-                <Card className="border-0 shadow-xl shadow-slate-200/50 bg-white/90 backdrop-blur-xl overflow-hidden transition-all duration-500">
-                    {/* Progress Bar */}
-                    <div className="h-2 w-full bg-slate-100">
+                <Card className="border-0 shadow-xl shadow-slate-200/50 bg-white/90 backdrop-blur-xl overflow-hidden">
+                    {/* Progress bar */}
+                    <div className="h-1.5 w-full bg-slate-100">
                         <div
                             className="h-full bg-teal-500 transition-all duration-500 ease-out"
-                            style={{ width: `${((currentStep + 1) / steps.length) * 100}%` }}
+                            style={{ width: `${((step + 1) / TOTAL_STEPS) * 100}%` }}
                         />
                     </div>
 
                     <CardHeader className="pt-8 pb-4 text-center">
-                        <div className="text-sm font-semibold text-teal-600 tracking-wider uppercase mb-2">
-                            Step {currentStep + 1} of {steps.length}
+                        <div className="flex items-center justify-center mb-3">
+                            <div className="size-12 rounded-2xl bg-teal-50 flex items-center justify-center">
+                                <StepIcon className="size-6 text-teal-600" />
+                            </div>
                         </div>
-                        <CardTitle className="text-2xl text-slate-800">{currentStepData.title}</CardTitle>
-                        <CardDescription className="text-base">{currentStepData.subtitle}</CardDescription>
+                        <div className="text-xs font-semibold text-teal-600 tracking-wider uppercase mb-1">
+                            Step {step + 1} of {TOTAL_STEPS}
+                        </div>
+                        <CardTitle className="text-2xl text-slate-800">{title}</CardTitle>
+                        <CardDescription className="text-sm mt-1">{subtitle}</CardDescription>
                     </CardHeader>
 
-                    <CardContent className="px-8 pb-8 pt-4">
-                        <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                            {currentStepData.id !== 'final' ? (
-                                <RadioGroup
-                                    value={answers[currentStepData.id]}
-                                    onValueChange={(val: string) => setAnswers(prev => ({ ...prev, [currentStepData.id]: val }))}
-                                    className="gap-4"
-                                >
-                                    {currentStepData.options?.map((option) => (
-                                        <div key={option.value}>
-                                            <RadioGroupItem
-                                                value={option.value}
-                                                id={option.value}
-                                                className="peer sr-only"
-                                            />
-                                            <Label
-                                                htmlFor={option.value}
-                                                className="flex items-center justify-between p-4 bg-slate-50 border-2 border-slate-100 rounded-xl cursor-pointer hover:bg-teal-50 hover:border-teal-100 peer-data-[state=checked]:border-teal-500 peer-data-[state=checked]:bg-teal-50/50 peer-data-[state=checked]:shadow-sm transition-all"
-                                            >
-                                                <div className="flex items-center gap-4">
-                                                    <div className={`p-2 rounded-lg ${answers[currentStepData.id] === option.value ? 'bg-teal-100 text-teal-700' : 'bg-white text-slate-500 shadow-sm'}`}>
-                                                        <option.icon className="size-5" />
-                                                    </div>
-                                                    <span className={`text-base font-medium ${answers[currentStepData.id] === option.value ? 'text-teal-900' : 'text-slate-700'}`}>
-                                                        {option.label}
-                                                    </span>
-                                                </div>
-                                                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${answers[currentStepData.id] === option.value ? 'border-teal-500' : 'border-slate-300'}`}>
-                                                    {answers[currentStepData.id] === option.value && (
-                                                        <div className="w-2.5 h-2.5 rounded-full bg-teal-500" />
-                                                    )}
-                                                </div>
-                                            </Label>
+                    <CardContent className="px-8 pb-4">
+                        <div className="animate-in fade-in slide-in-from-bottom-4 duration-400 space-y-5">
+
+                            {/* ── Step 0: Personal Info ── */}
+                            {step === 0 && (
+                                <>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="col-span-2 space-y-1.5">
+                                            <Label>Full Name <span className="text-red-400">*</span></Label>
+                                            <Input placeholder="e.g. Priya Sharma" value={personal.full_name}
+                                                onChange={e => setPersonal(p => ({ ...p, full_name: e.target.value }))} />
                                         </div>
-                                    ))}
-                                </RadioGroup>
-                            ) : (
-                                <div className="space-y-4">
-                                    <Label htmlFor="notes" className="text-slate-700 text-base">Any custom notes or conditions?</Label>
-                                    <Textarea
-                                        id="notes"
-                                        placeholder="E.g., I have pet allergies, or I'm sensitive to dust..."
-                                        className="min-h-[150px] resize-none focus-visible:ring-teal-500 text-base p-4 bg-slate-50"
-                                        value={answers.notes}
-                                        onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setAnswers(prev => ({ ...prev, notes: e.target.value }))}
-                                    />
-                                    <div className="bg-teal-50 text-teal-800 p-4 rounded-xl flex items-start gap-3 mt-6 border border-teal-100">
+                                        <div className="space-y-1.5">
+                                            <Label>Phone</Label>
+                                            <Input type="tel" placeholder="+91 98765 43210" value={personal.phone}
+                                                onChange={e => setPersonal(p => ({ ...p, phone: e.target.value }))} />
+                                        </div>
+                                        <div className="space-y-1.5">
+                                            <Label>Age</Label>
+                                            <Input type="number" placeholder="25" min={1} max={120} value={personal.age}
+                                                onChange={e => setPersonal(p => ({ ...p, age: e.target.value }))} />
+                                        </div>
+                                        <div className="col-span-2 space-y-1.5">
+                                            <Label>Gender <span className="text-red-400">*</span></Label>
+                                            <select
+                                                value={personal.gender}
+                                                onChange={e => setPersonal(p => ({ ...p, gender: e.target.value as 'Male' | 'Female' | 'Other' }))}
+                                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                                            >
+                                                <option value="">Select gender...</option>
+                                                <option value="Male">Male</option>
+                                                <option value="Female">Female</option>
+                                                <option value="Other">Other / Prefer not to say</option>
+                                            </select>
+                                        </div>
+                                        <div className="col-span-2 space-y-1.5">
+                                            <Label>Address / Area</Label>
+                                            <Input placeholder="e.g. Anna Nagar, Chennai" value={personal.address}
+                                                onChange={e => setPersonal(p => ({ ...p, address: e.target.value }))} />
+                                        </div>
+                                    </div>
+                                </>
+                            )}
+
+                            {/* ── Step 1: Respiratory ── */}
+                            {step === 1 && (
+                                <>
+                                    <BoolQuestion label="Have you been diagnosed with Asthma?" value={health.has_asthma}
+                                        onChange={v => setHealth(h => ({ ...h, has_asthma: v }))} />
+                                    <BoolQuestion label="Have you been diagnosed with COPD (Chronic Obstructive Pulmonary Disease)?" value={health.has_copd}
+                                        onChange={v => setHealth(h => ({ ...h, has_copd: v }))} />
+                                    <BoolQuestion label="Do you suffer from seasonal or environmental allergies (dust, pollen, pet dander)?" value={health.has_allergies}
+                                        onChange={v => setHealth(h => ({ ...h, has_allergies: v }))} />
+                                </>
+                            )}
+
+                            {/* ── Step 2: Cardiovascular ── */}
+                            {step === 2 && (
+                                <BoolQuestion label="Do you have a diagnosed cardiovascular (heart) condition such as coronary artery disease, arrhythmia, or hypertension?" value={health.has_heart_condition}
+                                    onChange={v => setHealth(h => ({ ...h, has_heart_condition: v }))} />
+                            )}
+
+                            {/* ── Step 3: Special conditions ── */}
+                            {step === 3 && (
+                                <>
+                                    {personal.gender === 'Female' && (
+                                        <BoolQuestion label="Are you currently pregnant?" value={health.is_pregnant}
+                                            onChange={v => setHealth(h => ({ ...h, is_pregnant: v }))} />
+                                    )}
+                                    {personal.gender !== 'Female' && health.is_pregnant === null && (
+                                        // Auto-set non-females to false
+                                        <div className="hidden">{(() => { setHealth(h => ({ ...h, is_pregnant: false })); return null })()}</div>
+                                    )}
+                                    <BoolQuestion label="Do you regularly use an inhaler or any respiratory medication?" value={health.takes_inhaler}
+                                        onChange={v => setHealth(h => ({ ...h, takes_inhaler: v }))} />
+                                </>
+                            )}
+
+                            {/* ── Step 4: Lifestyle ── */}
+                            {step === 4 && (
+                                <>
+                                    <div className="space-y-1.5">
+                                        <Label>Smoking Status</Label>
+                                        <select
+                                            value={health.smoking_status}
+                                            onChange={e => setHealth(h => ({ ...h, smoking_status: e.target.value as 'Never' | 'Former' | 'Current' }))}
+                                            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                                        >
+                                            <option value="">Select one...</option>
+                                            <option value="Never">Never smoked</option>
+                                            <option value="Former">Former smoker</option>
+                                            <option value="Current">Current smoker</option>
+                                        </select>
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <Label>Physical Fitness Level</Label>
+                                        <select
+                                            value={health.fitness_level}
+                                            onChange={e => setHealth(h => ({ ...h, fitness_level: e.target.value as 'Sedentary' | 'Moderate' | 'Active' }))}
+                                            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                                        >
+                                            <option value="">Select one...</option>
+                                            <option value="Active">Active — exercise 4+ days a week</option>
+                                            <option value="Moderate">Moderate — light exercise 1–3 days a week</option>
+                                            <option value="Sedentary">Sedentary — little to no regular exercise</option>
+                                        </select>
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <Label>Daily Outdoor Exposure</Label>
+                                        <select
+                                            value={health.outdoor_exposure}
+                                            onChange={e => setHealth(h => ({ ...h, outdoor_exposure: e.target.value as 'Low' | 'Medium' | 'High' }))}
+                                            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                                        >
+                                            <option value="">Select one...</option>
+                                            <option value="High">High — most of the day outdoors</option>
+                                            <option value="Medium">Medium — a few hours outdoors</option>
+                                            <option value="Low">Low — mostly indoors</option>
+                                        </select>
+                                    </div>
+                                </>
+                            )}
+
+                            {/* ── Step 5: Breathing patterns ── */}
+                            {step === 5 && (
+                                <div className="space-y-1.5">
+                                    <Label>How often do you experience shortness of breath or chest tightness?</Label>
+                                    <div className="grid grid-cols-3 gap-3 mt-2">
+                                        {(['Never', 'Sometimes', 'Often'] as const).map(opt => (
+                                            <button key={opt} type="button"
+                                                onClick={() => setHealth(h => ({ ...h, breathing_difficulty: opt }))}
+                                                className={`py-4 rounded-xl text-sm font-semibold border-2 transition-all ${health.breathing_difficulty === opt
+                                                    ? 'bg-teal-50 border-teal-500 text-teal-700'
+                                                    : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300'
+                                                    }`}>
+                                                {opt}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* ── Step 6: Summary + Notes ── */}
+                            {step === 6 && (
+                                <div className="space-y-6">
+                                    {/* Summary chips */}
+                                    <div>
+                                        <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Your Profile Summary</p>
+                                        <div className="flex flex-wrap gap-2">
+                                            {personal.full_name && <span className="bg-slate-100 text-slate-700 px-3 py-1 rounded-full text-sm font-medium">{personal.full_name}</span>}
+                                            {personal.gender && <span className="bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-sm font-medium border border-blue-100">{personal.gender}, {personal.age ? `age ${personal.age}` : ''}</span>}
+                                            {health.has_asthma && <span className="bg-orange-50 text-orange-700 px-3 py-1 rounded-full text-sm font-medium border border-orange-100">Asthma</span>}
+                                            {health.has_copd && <span className="bg-orange-50 text-orange-700 px-3 py-1 rounded-full text-sm font-medium border border-orange-100">COPD</span>}
+                                            {health.has_allergies && <span className="bg-yellow-50 text-yellow-700 px-3 py-1 rounded-full text-sm font-medium border border-yellow-100">Allergies</span>}
+                                            {health.has_heart_condition && <span className="bg-rose-50 text-rose-700 px-3 py-1 rounded-full text-sm font-medium border border-rose-100">Heart Condition</span>}
+                                            {health.is_pregnant && <span className="bg-purple-50 text-purple-700 px-3 py-1 rounded-full text-sm font-medium border border-purple-100">Pregnant</span>}
+                                            {health.takes_inhaler && <span className="bg-teal-50 text-teal-700 px-3 py-1 rounded-full text-sm font-medium border border-teal-100">Inhaler User</span>}
+                                            {health.fitness_level && <span className="bg-green-50 text-green-700 px-3 py-1 rounded-full text-sm font-medium border border-green-100">{health.fitness_level} Fitness</span>}
+                                            {health.smoking_status && health.smoking_status !== 'Never' && <span className="bg-slate-100 text-slate-600 px-3 py-1 rounded-full text-sm font-medium">{health.smoking_status} Smoker</span>}
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-1.5">
+                                        <Label>Any other conditions or notes? <span className="text-slate-400 font-normal">(optional)</span></Label>
+                                        <Textarea
+                                            placeholder="E.g. I have pet allergies, or I'm recovering from a respiratory infection..."
+                                            className="min-h-[100px] resize-none focus-visible:ring-teal-500 text-sm p-4 bg-slate-50"
+                                            value={health.custom_notes}
+                                            onChange={e => setHealth(h => ({ ...h, custom_notes: e.target.value }))}
+                                        />
+                                    </div>
+
+                                    <div className="bg-teal-50 text-teal-800 p-4 rounded-xl flex items-start gap-3 border border-teal-100">
                                         <Wind className="size-5 shrink-0 mt-0.5" />
                                         <p className="text-sm leading-relaxed">
-                                            We'll use these settings to send you hyper-local alerts and personalize your daily dashboard insights. You can always change these later in your profile.
+                                            Your health profile is used to personalize alerts, route recommendations, and AQI thresholds. You can edit it anytime from your profile settings.
                                         </p>
                                     </div>
                                 </div>
                             )}
+
+                            {/* Error message */}
+                            {error && (
+                                <p className="text-sm text-red-500 font-medium bg-red-50 px-4 py-3 rounded-xl border border-red-100">{error}</p>
+                            )}
                         </div>
                     </CardContent>
 
-                    <CardFooter className="px-8 pb-8 pt-0 flex justify-between">
-                        <Button
-                            variant="ghost"
-                            onClick={handleBack}
-                            disabled={currentStep === 0}
-                            className={`text-slate-500 hover:text-slate-900 hover:bg-slate-100 ${currentStep === 0 ? 'opacity-0' : 'opacity-100'}`}
-                        >
+                    <CardFooter className="px-8 pb-8 pt-2 flex justify-between">
+                        <Button variant="ghost" onClick={handleBack} disabled={step === 0 || isPending}
+                            className={`text-slate-500 hover:text-slate-900 hover:bg-slate-100 ${step === 0 ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
                             <ChevronLeft className="mr-2 size-4" />
                             Back
                         </Button>
 
-                        <Button
-                            onClick={handleNext}
-                            disabled={!canProceed()}
-                            className="bg-teal-600 hover:bg-teal-700 text-white shadow-md shadow-teal-500/20 px-8 disabled:opacity-50 transition-all rounded-full"
-                        >
-                            {currentStep === steps.length - 1 ? 'Go to Dashboard' : 'Next'}
-                            {currentStep !== steps.length - 1 && <ChevronRight className="ml-2 size-4" />}
+                        <Button onClick={handleNext} disabled={!canProceed() || isPending}
+                            className="bg-teal-600 hover:bg-teal-700 text-white shadow-md shadow-teal-500/20 px-8 disabled:opacity-50 transition-all rounded-full">
+                            {isPending
+                                ? <><Loader2 className="mr-2 size-4 animate-spin" /> Saving...</>
+                                : isLastStep
+                                    ? <><CheckCircle2 className="mr-2 size-4" /> Go to Dashboard</>
+                                    : <>Next <ChevronRight className="ml-2 size-4" /></>}
                         </Button>
                     </CardFooter>
                 </Card>

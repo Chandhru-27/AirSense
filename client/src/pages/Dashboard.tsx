@@ -1,5 +1,5 @@
 import { useAQIStore, type TimeFrame } from '../stores/aqiStore'
-import { usePersonalizationStore } from '../stores/personalizationStore'
+import { useProfile, useHealthProfile } from '../lib/hooks'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { MapPin, Wind, CloudRain, Sun, Cloud, AlertCircle, Thermometer, Info, Activity, Droplets, CloudDrizzle, Snowflake, CloudLightning, CloudFog } from 'lucide-react'
@@ -12,6 +12,7 @@ import { getWeatherInfo, type WeatherIcon } from '@/lib/weatherCodeMap'
 import { useNearestAQI } from '@/hooks/useNearestAQI'
 import { useForecast, type ForecastHorizon } from '@/hooks/useForecast'
 import { useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
 
 // Heatmap and map controllers are now modularized in MapView.tsx
 
@@ -35,7 +36,9 @@ function WeatherIcon({ icon, className }: { icon: WeatherIcon; className?: strin
 
 export default function Dashboard() {
     const { forecastAQI, selectedTimeFrame, setTimeFrame } = useAQIStore()
-    const { medicalCategory, asthma, pregnancy } = usePersonalizationStore()
+    const { data: userProfile } = useProfile()
+    const { data: healthProfile } = useHealthProfile()
+    const navigate = useNavigate()
 
     const currentAQIData = forecastAQI[selectedTimeFrame]
 
@@ -134,57 +137,33 @@ export default function Dashboard() {
         return rows
     }, [aqiData, nearestNode, now.getHours()])
 
-    // Generate personalized insights based on Zustand store
+    // Generate personalized insights based on real health profile
     const getInsights = () => {
         const insights = []
+        const hasAsthma = healthProfile?.has_asthma ?? false
+        const hasHeartCondition = healthProfile?.has_heart_condition ?? false
+        const isPregnant = healthProfile?.is_pregnant ?? false
 
-        // Generic insight based on AQI
         if (currentAQIData.value > 100) {
-            insights.push({
-                id: 1,
-                title: 'Pollution levels are elevated',
-                desc: `Today pollution levels are ${(currentAQIData.value - 50)}% higher than average.`,
-                type: 'warning'
-            })
+            insights.push({ id: 1, title: 'Pollution levels are elevated', desc: `Today pollution levels are ${(currentAQIData.value - 50)}% higher than average.`, type: 'warning' })
         } else {
-            insights.push({
-                id: 1,
-                title: 'Air quality is fair',
-                desc: 'Great time for outdoor activities, pollution is minimal.',
-                type: 'success'
-            })
+            insights.push({ id: 1, title: 'Air quality is fair', desc: 'Great time for outdoor activities, pollution is minimal.', type: 'success' })
         }
-
-        // Personalized insights
-        if (asthma || medicalCategory === 'Asthma Patient') {
-            if (currentAQIData.value > 80) {
-                insights.push({
-                    id: 2,
-                    title: 'Asthma Alert',
-                    desc: 'High particulate matter detected. Carry your inhaler and limit strenuous outdoor exercise.',
-                    type: 'danger'
-                })
-            }
+        if (hasAsthma && currentAQIData.value > 80) {
+            insights.push({ id: 2, title: 'Asthma Alert', desc: 'High particulate matter detected. Carry your inhaler and limit outdoor exercise.', type: 'danger' })
         }
-
+        if (hasHeartCondition && currentAQIData.value > 100) {
+            insights.push({ id: 3, title: 'Cardiovascular Advisory', desc: 'Elevated pollution can strain the heart. Avoid prolonged outdoor exposure.', type: 'danger' })
+        }
+        if (isPregnant && currentAQIData.value > 75) {
+            insights.push({ id: 4, title: 'Pregnancy Advisory', desc: 'Avoid areas with high traffic emissions. AQI is above safe levels for expectant mothers.', type: 'warning' })
+        }
         if (precipitation()) {
-            insights.push({
-                id: 3,
-                title: 'Rain Expected',
-                desc: 'Rain will likely clear up particulate matter, improving AQI later today.',
-                type: 'info'
-            })
+            insights.push({ id: 5, title: 'Rain Expected', desc: 'Rain will likely clear up particulate matter, improving AQI later today.', type: 'info' })
         }
-
-        if (currentAQIData.value > 150 || (asthma && currentAQIData.value > 100)) {
-            insights.push({
-                id: 4,
-                title: 'Mask Recommended',
-                desc: 'Wear an N95 mask if you must go outside.',
-                type: 'danger'
-            })
+        if (currentAQIData.value > 150 || (hasAsthma && currentAQIData.value > 100)) {
+            insights.push({ id: 6, title: 'Mask Recommended', desc: 'Wear an N95 mask if you must go outside.', type: 'danger' })
         }
-
         return insights
     }
 
@@ -534,30 +513,33 @@ export default function Dashboard() {
                         </div>
 
                         {/* Profile Context Card */}
-                        <Card className="border shadow-md rounded-3xl bg-white overflow-hidden" style={{ borderColor: '#DCEBFA', boxShadow: '0 4px 12px rgba(167,199,231,0.25)' }}>
+                        <Card className="border shadow-md rounded-xs bg-white overflow-hidden" style={{ borderColor: '#DCEBFA', boxShadow: '0 4px 12px rgba(167,199,231,0.25)' }}>
                             <div className="h-2 w-full" style={{ background: 'linear-gradient(135deg, #A7C7E7, #89B6E3)' }} />
                             <CardContent className="p-6">
-                                <h4 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4">Active Profile</h4>
+                                <h4 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-1">Active Profile</h4>
+                                {userProfile?.full_name && (
+                                    <p className="text-base font-bold text-slate-700 mb-4">{userProfile.full_name}</p>
+                                )}
                                 <div className="flex flex-wrap gap-2">
-                                    {medicalCategory && (
-                                        <span className="bg-slate-100 text-slate-700 px-3 py-1.5 rounded-full text-sm font-medium border border-slate-200">
-                                            {medicalCategory}
-                                        </span>
+                                    {userProfile?.age && <span className="bg-slate-100 text-slate-600 px-3 py-1.5 rounded-full text-xs font-medium">Age {userProfile.age}</span>}
+                                    {userProfile?.gender && <span className="bg-blue-50 text-blue-700 px-3 py-1.5 rounded-full text-xs font-medium border border-blue-100">{userProfile.gender}</span>}
+                                    {healthProfile?.has_asthma && <span className="bg-orange-50 text-orange-700 px-3 py-1.5 rounded-full text-xs font-medium border border-orange-200">Asthma</span>}
+                                    {healthProfile?.has_copd && <span className="bg-orange-50 text-orange-700 px-3 py-1.5 rounded-full text-xs font-medium border border-orange-200">COPD</span>}
+                                    {healthProfile?.has_allergies && <span className="bg-yellow-50 text-yellow-700 px-3 py-1.5 rounded-full text-xs font-medium border border-yellow-200">Allergies</span>}
+                                    {healthProfile?.has_heart_condition && <span className="bg-rose-50 text-rose-700 px-3 py-1.5 rounded-full text-xs font-medium border border-rose-200">Heart Condition</span>}
+                                    {healthProfile?.is_pregnant && <span className="bg-purple-50 text-purple-700 px-3 py-1.5 rounded-full text-xs font-medium border border-purple-200">Pregnant</span>}
+                                    {healthProfile?.takes_inhaler && <span className="bg-teal-50 text-teal-700 px-3 py-1.5 rounded-full text-xs font-medium border border-teal-200">Inhaler User</span>}
+                                    {healthProfile?.fitness_level && <span className="bg-green-50 text-green-700 px-3 py-1.5 rounded-full text-xs font-medium border border-green-200">{healthProfile.fitness_level} Fitness</span>}
+                                    {!healthProfile && (
+                                        <span className="text-slate-400 text-xs">No health profile yet</span>
                                     )}
-                                    {asthma && (
-                                        <span className="bg-rose-50 text-rose-700 px-3 py-1.5 rounded-full text-sm font-medium border border-rose-200">
-                                            Asthma Profile
-                                        </span>
-                                    )}
-                                    {pregnancy && (
-                                        <span className="bg-purple-50 text-purple-700 px-3 py-1.5 rounded-full text-sm font-medium border border-purple-200">
-                                            Pregnancy
-                                        </span>
-                                    )}
-                                    <span className="bg-slate-100 text-slate-700 px-3 py-1.5 rounded-full text-sm font-medium border border-slate-200 hover:bg-slate-200 cursor-pointer transition-colors">
-                                        Edit Preferences →
-                                    </span>
                                 </div>
+                                <button
+                                    onClick={() => navigate('/personalize')}
+                                    className="mt-4 text-xs font-semibold text-teal-600 hover:text-teal-700 transition-colors"
+                                >
+                                    Edit Health Profile →
+                                </button>
                             </CardContent>
                         </Card>
 

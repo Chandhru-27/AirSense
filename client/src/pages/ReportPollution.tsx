@@ -95,9 +95,9 @@ export default function ReportPollution() {
 
                 {isSuccess ? (
                     /* ── Success Card ─────────────────────────────────────────────── */
-                    <Card className="border-0 shadow-xl shadow-emerald-100/50 rounded-3xl overflow-hidden bg-white max-w-2xl mx-auto text-center p-12">
+                    <Card className="border-0 shadow-xl shadow-emerald-100/50 rounded-xs overflow-hidden bg-white max-w-2xl mx-auto text-center p-12">
                         <CardContent className="space-y-6">
-                            <div className="size-24 bg-emerald-100 rounded-full flex items-center justify-center mx-auto text-emerald-600 mb-4 scale-in animate-in duration-500">
+                            <div className="size-24 bg-emerald-100 rounded-xs flex items-center justify-center mx-auto text-emerald-600 mb-4 scale-in animate-in duration-500">
                                 <CheckCircle2 className="size-12" />
                             </div>
                             <div className="space-y-2">
@@ -112,11 +112,11 @@ export default function ReportPollution() {
 
                             {/* Image confirmation */}
                             {submittedReport?.image_url && (
-                                <div className="flex items-center justify-center gap-3 bg-slate-50 rounded-2xl p-4 border border-slate-200">
+                                <div className="flex items-center justify-center gap-3 bg-slate-50 rounded-xs p-4 border border-slate-200">
                                     <img
                                         src={submittedReport.image_url}
                                         alt="Submitted evidence"
-                                        className="w-20 h-20 rounded-xl object-cover border border-slate-200"
+                                        className="w-20 h-20 rounded-xs object-cover border border-slate-200"
                                         onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
                                     />
                                     <div className="text-left">
@@ -128,7 +128,7 @@ export default function ReportPollution() {
                                 </div>
                             )}
 
-                            <div className="bg-emerald-50 p-6 rounded-2xl border border-emerald-100 flex items-start gap-4 text-left">
+                            <div className="bg-emerald-50 p-6 rounded-xs border border-emerald-100 flex items-start gap-4 text-left">
                                 <Building2 className="text-emerald-600 size-6 shrink-0 mt-1" />
                                 <div>
                                     <p className="font-bold text-emerald-900">What happens next?</p>
@@ -138,7 +138,7 @@ export default function ReportPollution() {
                             <Button
                                 onClick={handleFileAnother}
                                 variant="outline"
-                                className="h-12 px-8 rounded-xl font-semibold mt-4"
+                                className="h-12 px-8 rounded-xs font-semibold mt-4"
                             >
                                 File Another Report
                             </Button>
@@ -148,13 +148,13 @@ export default function ReportPollution() {
                     <div className="grid lg:grid-cols-5 gap-8">
                         {/* ── Form Section ─────────────────────────────────────────────── */}
                         <div className="lg:col-span-3 space-y-6">
-                            <Card className="border-0 shadow-md shadow-slate-200/50 rounded-3xl bg-white h-full">
+                            <Card className="border-0 shadow-md shadow-slate-200/50 rounded-xs bg-white h-full">
                                 <CardContent className="p-8 space-y-6">
                                     <form onSubmit={handleSubmit} className="space-y-6">
 
                                         {/* API error banner */}
                                         {apiError && (
-                                            <div className="flex items-start gap-3 bg-red-50 border border-red-200 text-red-700 rounded-2xl p-4 text-sm">
+                                            <div className="flex items-start gap-3 bg-red-50 border border-red-200 text-red-700 rounded-xs p-4 text-sm">
                                                 <AlertCircle className="size-5 shrink-0 mt-0.5" />
                                                 <span>{apiError}</span>
                                             </div>
@@ -169,7 +169,7 @@ export default function ReportPollution() {
                                                 value={description}
                                                 onChange={(e) => setDescription(e.target.value)}
                                                 placeholder="Example: 'Severe industrial smoke in Ambattur area' or 'Open garbage fire at Mandaveli junction'..."
-                                                className="min-h-[140px] border-slate-200 bg-slate-50/50 rounded-2xl p-4 focus-visible:ring-teal-500 text-base"
+                                                className="min-h-[140px] border-slate-200 bg-slate-50/50 rounded-xs p-4 focus-visible:ring-teal-500 text-base"
                                                 required
                                             />
                                         </div>
@@ -184,7 +184,7 @@ export default function ReportPollution() {
                                             </p>
 
                                             {imageError && (
-                                                <div className="flex items-center gap-2 bg-red-50 border border-red-200 text-red-600 rounded-xl px-4 py-2.5 text-sm">
+                                                <div className="flex items-center gap-2 bg-red-50 border border-red-200 text-red-600 rounded-xs px-4 py-2.5 text-sm">
                                                     <AlertCircle className="size-4 shrink-0" />
                                                     <span>{imageError}</span>
                                                 </div>

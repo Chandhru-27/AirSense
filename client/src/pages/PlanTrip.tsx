@@ -57,8 +57,8 @@ export default function PlanTrip() {
 
         <div className="max-w-4xl mx-auto space-y-6">
           {/* Main Content: Search */}
-          <Card className="border-0 shadow-lg rounded-3xl overflow-visible" style={{ boxShadow: "0 4px 12px rgba(167,199,231,0.25)" }}>
-            <div className="p-8 text-white relative overflow-hidden rounded-t-3xl" style={{ background: "linear-gradient(135deg, #5F9EC0, #89B6E3)" }}>
+          <Card className="border-0 shadow-lg rounded-xs overflow-visible">
+            <div className="p-8 text-white relative overflow-hidden rounded-t-xs" style={{ background: "linear-gradient(135deg, #5F9EC0, #89B6E3)" }}>
               <div className="absolute right-0 top-0 opacity-10">
                 <Compass className="size-48 -mr-12 -mt-12" />
               </div>
@@ -96,7 +96,7 @@ export default function PlanTrip() {
                 <Button
                   onClick={handleAnalyze}
                   disabled={!startPoint || !endPoint || isPending}
-                  className="flex-1 h-14 text-white rounded-2xl shadow-md text-lg font-medium transition-all hover:opacity-90 disabled:opacity-50"
+                  className="flex-1 h-14 text-white rounded-xs shadow-md text-lg font-medium transition-all hover:opacity-90 disabled:opacity-50"
                   style={{
                     backgroundColor: "#5F9EC0",
                     boxShadow: "0 4px 12px rgba(95, 158, 192, 0.3)",
@@ -125,7 +125,7 @@ export default function PlanTrip() {
                   return (
                     <Card
                       key={route.route_id}
-                      className={`relative border-2 rounded-3xl overflow-hidden shadow-sm hover:shadow-md transition-shadow ${
+                      className={`relative border-2 rounded-xs overflow-hidden shadow-sm hover:shadow-md transition-shadow ${
                         isBest ? "border-emerald-400" : "border-slate-100"
                       }`}
                     >
@@ -141,7 +141,7 @@ export default function PlanTrip() {
                             <p className="text-2xl font-bold text-slate-800">{route.duration_min} min</p>
                             <p className="text-sm text-slate-500">{route.distance_km} km</p>
                           </div>
-                          <span className={`px-3 py-1 rounded-full text-xs font-bold border ${getRiskColor(route.risk)}`}>
+                          <span className={`px-3 py-1 rounded-xs text-xs font-bold border ${getRiskColor(route.risk)}`}>
                             {route.risk} Risk
                           </span>
                         </div>
@@ -152,7 +152,7 @@ export default function PlanTrip() {
                               <span className="text-slate-600">Exposure Score</span>
                               <span className="font-semibold text-slate-800">{route.exposure_score}</span>
                             </div>
-                            <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
+                            <div className="h-2 w-full bg-slate-100 rounded-xs overflow-hidden">
                               <div
                                 className={`h-full ${route.risk === "High" ? "bg-red-400" : route.risk === "Medium" ? "bg-orange-400" : "bg-emerald-400"}`}
                                 style={{ width: `${Math.min(100, (route.exposure_score / 15) * 100)}%` }} // Rough scaling
@@ -160,13 +160,13 @@ export default function PlanTrip() {
                             </div>
                           </div>
 
-                          <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                          <div className="bg-slate-50 p-3 rounded-xs border border-slate-100">
                             <p className="text-xs text-slate-500 mb-1 font-medium">Avg AQI Focus</p>
                             <p className="text-lg font-bold text-slate-700">{route.avg_aqi}</p>
                           </div>
 
                           {route.insights && route.insights.length > 0 && (
-                            <div className="bg-blue-50 text-blue-800 p-3 rounded-xl border border-blue-100 text-sm flex items-start gap-2">
+                            <div className="bg-blue-50 text-blue-800 p-3 rounded-xs border border-blue-100 text-sm flex items-start gap-2">
                               <Info className="size-4 shrink-0 mt-0.5 text-blue-500" />
                               <ul className="list-disc pl-4 space-y-1">
                                 {route.insights.map((insight: string, idx: number) => (
@@ -203,9 +203,9 @@ export default function PlanTrip() {
               </div>
             </div>
           ) : (
-            <Card className="border-0 shadow-sm rounded-3xl bg-white/50 backdrop-blur-sm" style={{ borderColor: "#DCEBFA" }}>
+            <Card className="border-0 shadow-sm rounded-xs bg-white/50 backdrop-blur-sm" style={{ borderColor: "#DCEBFA" }}>
               <CardContent className="p-12 text-center flex flex-col items-center justify-center" style={{ color: "#5F7A94" }}>
-                <div className="size-20 rounded-full flex items-center justify-center mb-4 border-4 border-white shadow-sm" style={{ backgroundColor: "#EAF4FF" }}>
+                <div className="size-20 rounded-xs flex items-center justify-center mb-4 border-4 border-white shadow-sm" style={{ backgroundColor: "#EAF4FF" }}>
                   <Map className="size-8" style={{ color: "#89B6E3" }} />
                 </div>
                 <h3 className="text-lg font-semibold w-full mb-1" style={{ color: "#2C3E50" }}>No active route</h3>

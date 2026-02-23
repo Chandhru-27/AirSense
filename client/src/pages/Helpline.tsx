@@ -3,13 +3,31 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
-import { Phone, Mail, MessageSquare, Heart, Shield, Loader2, CheckCircle2 } from 'lucide-react'
+import { Phone, Mail, MessageSquare, Heart, Shield, Loader2, CheckCircle2, X, User } from 'lucide-react'
 import { useSendMessage } from '../lib/hooks'
+
+const COUNSELLORS = [
+    {
+        name: 'Dr. Priya Ramesh',
+        role: 'Clinical Psychologist',
+        phone: '+91 98413 22801',
+        email: 'priya.ramesh@airsense.com',
+        availability: 'Mon – Fri, 9 AM – 6 PM',
+    },
+    {
+        name: 'Mr. Arjun Mehta',
+        role: 'Mental Health Counsellor',
+        phone: '+91 77180 56342',
+        email: 'arjun.mehta@airsense.com',
+        availability: '24 / 7 Emergency',
+    },
+]
 
 export default function Helpline() {
     const [isSent, setIsSent] = useState(false)
     const [formData, setFormData] = useState({ full_name: '', email: '', message: '' })
     const { mutateAsync: sendMessage, isPending: isSending } = useSendMessage()
+    const [showCounsellorModal, setShowCounsellorModal] = useState(false)
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -83,7 +101,10 @@ export default function Helpline() {
                                     <p className="text-teal-50 text-base leading-relaxed font-medium">
                                         Air quality can impact your mental well-being. If you're feeling overwhelmed, anxious, or just need to talk, we can connect you with a professional counsellor immediately.
                                     </p>
-                                    <Button className="w-full bg-white text-teal-700 hover:bg-teal-50 h-14 rounded-2xl font-bold text-lg shadow-lg">
+                                    <Button
+                                        onClick={() => setShowCounsellorModal(true)}
+                                        className="w-full bg-white text-teal-700 hover:bg-teal-50 h-14 rounded-2xl font-bold text-lg shadow-lg"
+                                    >
                                         Connect with a Counsellor
                                     </Button>
                                     <p className="text-xs text-teal-100 text-center">Your privacy is our priority. All conversations are confidential.</p>
@@ -143,6 +164,85 @@ export default function Helpline() {
                     </Card>
                 </div>
             </div>
+
+            {/* ── Counsellor Contact Modal ───────────────────────────────────────── */}
+            {showCounsellorModal && (
+                <div
+                    className="fixed inset-0 z-50 flex items-center justify-center p-4"
+                    style={{ backgroundColor: 'rgba(15,23,42,0.6)', backdropFilter: 'blur(4px)' }}
+                    onClick={(e) => { if (e.target === e.currentTarget) setShowCounsellorModal(false) }}
+                >
+                    <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-300">
+                        {/* Modal Header */}
+                        <div className="bg-gradient-to-r from-teal-600 to-blue-700 p-6 text-white relative">
+                            <button
+                                onClick={() => setShowCounsellorModal(false)}
+                                className="absolute top-4 right-4 size-8 flex items-center justify-center rounded-full bg-white/20 hover:bg-white/30 transition-colors"
+                            >
+                                <X className="size-4" />
+                            </button>
+                            <div className="flex items-center gap-3 mb-1">
+                                <Shield className="size-5" />
+                                <h2 className="text-xl font-bold">Our Counsellors</h2>
+                            </div>
+                            <p className="text-teal-100 text-sm">All conversations are strictly confidential</p>
+                        </div>
+
+                        {/* Counsellor Cards */}
+                        <div className="p-6 space-y-4">
+                            {COUNSELLORS.map((c) => (
+                                <div
+                                    key={c.email}
+                                    className="rounded-2xl border border-slate-100 bg-slate-50 p-5 space-y-3"
+                                >
+                                    <div className="flex items-center gap-3">
+                                        <div className="size-11 rounded-full bg-teal-100 flex items-center justify-center text-teal-700">
+                                            <User className="size-5" />
+                                        </div>
+                                        <div>
+                                            <p className="font-bold text-slate-900">{c.name}</p>
+                                            <p className="text-xs text-slate-500">{c.role}</p>
+                                        </div>
+                                        <span className="ml-auto text-xs bg-teal-50 text-teal-700 border border-teal-200 px-2.5 py-1 rounded-full font-medium whitespace-nowrap">
+                                            {c.availability}
+                                        </span>
+                                    </div>
+
+                                    <div className="space-y-2 pl-1">
+                                        <a
+                                            href={`tel:${c.phone.replace(/\s/g, '')}`}
+                                            className="flex items-center gap-3 text-sm font-semibold text-slate-700 hover:text-teal-600 transition-colors group"
+                                        >
+                                            <span className="size-8 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-teal-500 group-hover:bg-teal-50 transition-colors">
+                                                <Phone className="size-4" />
+                                            </span>
+                                            {c.phone}
+                                        </a>
+                                        <a
+                                            href={`mailto:${c.email}`}
+                                            className="flex items-center gap-3 text-sm font-semibold text-slate-700 hover:text-blue-600 transition-colors group"
+                                        >
+                                            <span className="size-8 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-blue-500 group-hover:bg-blue-50 transition-colors">
+                                                <Mail className="size-4" />
+                                            </span>
+                                            {c.email}
+                                        </a>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+
+                        <div className="px-6 pb-6">
+                            <Button
+                                onClick={() => setShowCounsellorModal(false)}
+                                className="w-full h-12 rounded-2xl bg-slate-900 hover:bg-slate-800 text-white font-semibold"
+                            >
+                                Close
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }

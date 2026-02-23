@@ -2,6 +2,9 @@ import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGrou
 import { LayoutDashboard, Map, Bot, LogOut, User as UserIcon, PhoneCall, AlertTriangle } from "lucide-react"
 import { useAuthStore } from "../../stores/authStore"
 import { useNavigate, useLocation, Link } from "react-router-dom"
+import { useLogout } from "../../lib/hooks"
+import { useProfile } from "../../lib/hooks"
+import { useQueryClient } from "@tanstack/react-query"
 
 const items = [
     {
@@ -40,9 +43,29 @@ export function AppSidebar() {
     const { user, logout } = useAuthStore()
     const navigate = useNavigate()
     const location = useLocation()
+    const { mutateAsync: logoutApi } = useLogout()
+    const { data: profile } = useProfile()
+    const queryClient = useQueryClient()
 
-    const handleLogout = () => {
+    // Prefer API full_name, fall back to Zustand username, then 'Guest'
+    const displayName = profile?.full_name || user?.name || 'Guest'
+    const displayEmail = profile?.email || user?.email || ''
+
+    const handleLogout = async () => {
+        // Call backend (blocklists refresh token) + clears localStorage tokens
+        try {
+            await logoutApi()
+        } catch {
+            // If API fails, still clear client-side data
+            localStorage.removeItem('access_token')
+            localStorage.removeItem('refresh_token')
+            localStorage.removeItem('token')
+        }
+        // Clear React Query cache so stale user data doesn't persist
+        queryClient.clear()
+        // Clear Zustand auth state
         logout()
+        // Navigate to login (using React Router, not a hard refresh)
         navigate('/login')
     }
 
@@ -78,12 +101,12 @@ export function AppSidebar() {
                     <SidebarMenuItem>
                         <SidebarMenuButton className="h-12 border-t border-border/50 rounded-none">
                             <div className="flex items-center gap-3">
-                                <div className="flex h-8 w-8 items-center justify-center rounded-full" style={{ backgroundColor: '#CFE8FF', color: '#5F7A94' }}>
+                                <div className="flex h-8 w-8 items-center justify-center rounded-xds" style={{ backgroundColor: '#CFE8FF', color: '#5F7A94' }}>
                                     <UserIcon className="size-4" />
                                 </div>
                                 <div className="grid flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden">
-                                    <span className="truncate font-semibold">{user?.name || 'Guest'}</span>
-                                    <span className="truncate text-xs text-muted-foreground">{user?.email || ''}</span>
+                                    <span className="truncate font-semibold">{displayName}</span>
+                                    <span className="truncate text-xs text-muted-foreground">{displayEmail}</span>
                                 </div>
                             </div>
                         </SidebarMenuButton>

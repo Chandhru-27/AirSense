@@ -39,11 +39,13 @@ export const authApi = {
   logout: async () => {
     try {
       await api.post("/auth/logout");
+    } catch {
+      // Ignore backend errors — always proceed with client-side logout
     } finally {
       localStorage.removeItem("access_token");
       localStorage.removeItem("refresh_token");
       localStorage.removeItem("token");
-      window.location.href = "/login";
+      // Navigation is handled by the calling component
     }
   },
 

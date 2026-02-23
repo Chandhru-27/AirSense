@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 
 // Temporary type to be moved to /lib/index.ts
 export interface User {
@@ -15,10 +16,23 @@ interface AuthState {
     logout: () => void;
 }
 
-export const useAuthStore = create<AuthState>((set) => ({
-    user: null,
-    token: null,
-    isAuthenticated: false,
-    login: (user, token) => set({ user, token, isAuthenticated: true }),
-    logout: () => set({ user: null, token: null, isAuthenticated: false }),
-}));
+export const useAuthStore = create<AuthState>()(
+    persist(
+        (set) => ({
+            user: null,
+            token: null,
+            isAuthenticated: false,
+            login: (user, token) => set({ user, token, isAuthenticated: true }),
+            logout: () => set({ user: null, token: null, isAuthenticated: false }),
+        }),
+        {
+            name: 'airsense-auth', // localStorage key
+            // Only persist the user identity fields, not functions
+            partialize: (state) => ({
+                user: state.user,
+                token: state.token,
+                isAuthenticated: state.isAuthenticated,
+            }),
+        }
+    )
+);
